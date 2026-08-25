@@ -1,3 +1,8 @@
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 const UI = {
   el(id) {
     return document.getElementById(id);
@@ -85,7 +90,7 @@ const UI = {
     t.innerHTML = `
       <div class="toast-body">
         <span class="toast-icon">${icon(type === 'success' ? 'checkCircle' : type === 'error' ? 'xCircle' : 'info')}</span>
-        <span>${msg}</span>
+        <span>${escapeHtml(msg)}</span>
       </div>`;
     root.appendChild(t);
     requestAnimationFrame(() => t.classList.add('show'));
@@ -128,6 +133,9 @@ const UI = {
     const metrics = Store.getMetrics();
     const unread = Store.getUnreadRepliesCount();
     const current = Store.get('currentView');
+    const settings = Store.get('settings');
+    const profileName = settings.profileName || 'Prashant Kumar';
+    const profileEmail = settings.profileEmail || 'prashant@samparka.io';
 
     sb.innerHTML = `
       <div class="sb-brand">
@@ -180,10 +188,10 @@ const UI = {
           <button class="pop-item" style="color:var(--red)" data-pop-action="signout">${icon('power')} Sign Out</button>
         </div>
         <button class="sb-user" id="sb-user-btn">
-          ${UI.avatar('Prashant Kumar')}
+          ${UI.avatar(profileName)}
           <div class="u-meta">
-            <div class="u-name">Prashant Kumar</div>
-            <div class="u-mail">prashant@samparka.io</div>
+            <div class="u-name">${escapeHtml(profileName)}</div>
+            <div class="u-mail">${escapeHtml(profileEmail)}</div>
           </div>
           ${icon('chevronUp', 'ic-14')}
         </button>
@@ -208,6 +216,9 @@ const UI = {
       } else if (action === 'docs') {
         UI.toast('Documentation would open here.');
       } else if (action === 'signout') {
+        Store.init();
+        UI.buildSidebar();
+        UI.navigate('dashboard');
         UI.toast('Signed out successfully.');
       }
     });

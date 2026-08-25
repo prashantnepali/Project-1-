@@ -71,7 +71,7 @@ function campaignRows(campaigns) {
     return `
     <tr class="row-click" data-campaign="${c.id}">
       <td>
-        <div class="cell-main">${c.name}</div>
+        <div class="cell-main">${escapeHtml(c.name)}</div>
         <div class="cell-sub">${UI.formatDate(c.createdAt)}</div>
       </td>
       <td>${campaignBadge(c.status)}</td>
@@ -108,22 +108,18 @@ function bindCampaignEvents(campaigns) {
 
   UI.delegate('#view', '[data-campaign-pause]', 'click', (e, el) => {
     e.stopPropagation();
+    Store.updateCampaign(el.dataset.campaignPause, { status: 'paused' });
     const c = Store.getCampaignById(el.dataset.campaignPause);
-    if (c) {
-      c.status = 'paused';
-      UI.toast(`Campaign "${c.name}" paused.`);
-      renderCampaigns();
-    }
+    if (c) UI.toast(`Campaign "${c.name}" paused.`);
+    renderCampaigns();
   });
 
   UI.delegate('#view', '[data-campaign-play]', 'click', (e, el) => {
     e.stopPropagation();
+    Store.updateCampaign(el.dataset.campaignPlay, { status: 'active' });
     const c = Store.getCampaignById(el.dataset.campaignPlay);
-    if (c) {
-      c.status = 'active';
-      UI.toast(`Campaign "${c.name}" activated.`);
-      renderCampaigns();
-    }
+    if (c) UI.toast(`Campaign "${c.name}" activated.`);
+    renderCampaigns();
   });
 
   UI.delegate('#view', '[data-action="new-campaign"]', 'click', () => {
@@ -159,7 +155,7 @@ function showCampaignDetail(c) {
     </div>
     <div class="mt24">
       <h4 style="margin-bottom:8px">Subject Line</h4>
-      <p style="font-size:13px;color:var(--text-2)">${c.subject}</p>
+      <p style="font-size:13px;color:var(--text-2)">${escapeHtml(c.subject)}</p>
     </div>
     <div class="mt16">
       <h4 style="margin-bottom:8px">Target Audience</h4>
@@ -169,5 +165,5 @@ function showCampaignDetail(c) {
       </div>
     </div>`;
 
-  UI.modal(c.name, body, { wide: true });
+  UI.modal(escapeHtml(c.name), body, { wide: true });
 }

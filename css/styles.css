@@ -423,6 +423,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 .i-purple { background: var(--purple-soft); color: var(--purple); }
 .i-green { background: var(--green-soft); color: var(--green); }
 .i-teal { background: var(--teal-soft); color: var(--teal); }
+.i-red { background: var(--red-soft); color: var(--red); }
 
 .m-val { font-size: 21px; font-weight: 800; letter-spacing: -0.02em; }
 .m-label { font-size: 12px; color: var(--text-3); font-weight: 600; }
@@ -788,3 +789,29 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 .toast-error .toast-icon { color: var(--red); }
 .toast-info .toast-icon { color: var(--blue); }
 #toast-root { position: fixed; top: 16px; right: 16px; z-index: 200; display: flex; flex-direction: column; align-items: flex-end; }
+
+[data-theme="dark"] {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface-2: #22262f;
+  --border: #2d3140;
+  --border-strong: #3b4050;
+  --text: #e8eaf0;
+  --text-2: #a0a6b6;
+  --text-3: #6b7387;
+  --brand-soft: rgba(234, 88, 12, 0.12);
+  --brand-softer: rgba(234, 88, 12, 0.06);
+  --brand-border: rgba(234, 88, 12, 0.25);
+  --green-soft: rgba(21, 128, 61, 0.12);
+  --red-soft: rgba(185, 28, 28, 0.12);
+  --amber-soft: rgba(180, 83, 9, 0.12);
+  --blue-soft: rgba(3, 105, 161, 0.12);
+  --indigo-soft: rgba(79, 70, 229, 0.12);
+  --teal-soft: rgba(15, 118, 110, 0.12);
+  --purple-soft: rgba(126, 34, 206, 0.12);
+  --pink-soft: rgba(190, 24, 93, 0.12);
+  --slate-soft: #22262f;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.4);
+  --ink: #12141c;
+}

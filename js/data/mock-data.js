@@ -119,7 +119,7 @@ function generateLeads(count) {
       name,
       firstName: name.split(' ')[0],
       lastName: name.split(' ').slice(1).join(' '),
-      email: name.toLowerCase().replace(' ', '.') + '@' + company.toLowerCase().replace(/[^a-z]/g, '') + '.com',
+      email: name.toLowerCase().replace(/ /g, '.') + '@' + company.toLowerCase().replace(/[^a-z]/g, '') + '.com',
       phone: '+91 ' + (7000000000 + Math.floor(Math.random() * 3000000000)),
       company,
       title: pick(TITLES),

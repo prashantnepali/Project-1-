@@ -76,12 +76,12 @@ function renderDashboard() {
                       <div class="row">
                         ${avatar(l.name, 'sm')}
                         <div>
-                          <div class="cell-main">${l.name}</div>
-                          <div class="cell-sub">${l.title}</div>
+                          <div class="cell-main">${escapeHtml(l.name)}</div>
+                          <div class="cell-sub">${escapeHtml(l.title)}</div>
                         </div>
                       </div>
                     </td>
-                    <td>${l.company}</td>
+                    <td>${escapeHtml(l.company)}</td>
                     <td>${statusBadge(l.status)}</td>
                     <td>${ring(l.score, 'sm')}</td>
                     <td><button class="ibtn" data-lead-view="${l.id}">${icon('eye', 'ic-14')}</button></td>
@@ -106,7 +106,7 @@ function renderDashboard() {
               <div class="act-item">
                 <div class="act-ic ${getActivityIconCls(a.type)}">${icon(getActivityIcon(a.type))}</div>
                 <div class="act-body">
-                  <div>${a.description}</div>
+                  <div>${escapeHtml(a.description)}</div>
                   <time>${UI.formatDate(a.timestamp)}</time>
                 </div>
               </div>
@@ -128,8 +128,8 @@ function renderDashboard() {
                   <span style="font-weight:800;color:var(--text-3);font-size:13px;width:18px">${i + 1}</span>
                   ${avatar(l.name, 'sm')}
                   <div>
-                    <div class="att-name">${l.name}</div>
-                    <div class="att-loc">${icon('globe', 'ic-14')} ${l.company}</div>
+                    <div class="att-name">${escapeHtml(l.name)}</div>
+                    <div class="att-loc">${icon('globe', 'ic-14')} ${escapeHtml(l.company)}</div>
                   </div>
                 </div>
                 <div class="att-side">
@@ -239,39 +239,37 @@ function showAddLeadModal() {
 
   UI.modal('Add New Lead', body, { footer });
 
-  setTimeout(() => {
-    UI.on('#save-lead-btn', 'click', () => {
-      const form = document.getElementById('add-lead-form');
-      const fd = new FormData(form);
-      const name = fd.get('name').trim();
-      if (!name) return UI.toast('Please enter a name.', 'error');
+  UI.on('#save-lead-btn', 'click', () => {
+    const form = document.getElementById('add-lead-form');
+    const fd = new FormData(form);
+    const name = fd.get('name').trim();
+    if (!name) return UI.toast('Please enter a name.', 'error');
 
-      const newLead = {
-        id: genId(),
-        name,
-        firstName: name.split(' ')[0],
-        lastName: name.split(' ').slice(1).join(' '),
-        email: fd.get('email').trim(),
-        phone: fd.get('phone').trim(),
-        company: fd.get('company').trim(),
-        title: fd.get('title').trim(),
-        industry: fd.get('industry'),
-        location: pick(LOCATIONS),
-        source: fd.get('source'),
-        status: 'new',
-        priority: fd.get('priority'),
-        score: Math.floor(Math.random() * 40) + 30,
-        tags: [fd.get('industry'), fd.get('source')],
-        notes: '',
-        createdAt: new Date(),
-        lastActivity: new Date(),
-      };
+    const newLead = {
+      id: genId(),
+      name,
+      firstName: name.split(' ')[0],
+      lastName: name.split(' ').slice(1).join(' '),
+      email: fd.get('email').trim(),
+      phone: fd.get('phone').trim(),
+      company: fd.get('company').trim(),
+      title: fd.get('title').trim(),
+      industry: fd.get('industry'),
+      location: pick(LOCATIONS),
+      source: fd.get('source'),
+      status: 'new',
+      priority: fd.get('priority'),
+      score: Math.floor(Math.random() * 40) + 30,
+      tags: [fd.get('industry'), fd.get('source')],
+      notes: '',
+      createdAt: new Date(),
+      lastActivity: new Date(),
+    };
 
-      Store.addLead(newLead);
-      UI.closeModal();
-      UI.toast(`${name} added to leads.`);
-      renderDashboard();
-      UI.buildSidebar();
-    }, 50);
+    Store.addLead(newLead);
+    UI.closeModal();
+    UI.toast(`${name} added to leads.`);
+    renderDashboard();
+    UI.buildSidebar();
   });
 }

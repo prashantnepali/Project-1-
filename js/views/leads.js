@@ -34,7 +34,7 @@ function renderLeads() {
         <div class="row" style="gap:8px">
           <div class="search-box">
             <span class="search-ic">${icon('search', 'ic-16')}</span>
-            <input type="text" id="lead-search" placeholder="Search leads..." value="${searchQuery}" class="search-input">
+            <input type="text" id="lead-search" placeholder="Search leads..." value="${escapeHtml(searchQuery)}" class="search-input">
           </div>
           <button class="ibtn" id="toggle-filters">${icon('filter')}</button>
         </div>
@@ -82,12 +82,12 @@ function renderLeads() {
                   <div class="row">
                     ${avatar(l.name, 'sm')}
                     <div>
-                      <div class="cell-main">${l.name}</div>
-                      <div class="cell-sub">${l.email}</div>
+                      <div class="cell-main">${escapeHtml(l.name)}</div>
+                      <div class="cell-sub">${escapeHtml(l.email)}</div>
                     </div>
                   </div>
                 </td>
-                <td>${l.company}</td>
+                <td>${escapeHtml(l.company)}</td>
                 <td>${statusBadge(l.status)}</td>
                 <td>${priorityTag(l.priority)}</td>
                 <td>${ring(l.score, 'sm')}</td>
@@ -123,8 +123,8 @@ function renderLeadDetail(id) {
       <div class="row" style="gap:16px">
         ${avatar(lead.name, 'lg')}
         <div>
-          <h1 class="page-title">${lead.name}</h1>
-          <p class="page-sub">${lead.title} at ${lead.company}</p>
+          <h1 class="page-title">${escapeHtml(lead.name)}</h1>
+          <p class="page-sub">${escapeHtml(lead.title)} at ${escapeHtml(lead.company)}</p>
         </div>
         ${statusBadge(lead.status)}
         ${priorityTag(lead.priority)}
@@ -153,12 +153,12 @@ function renderLeadDetail(id) {
           </div>
           <div class="card-body">
             <div class="info-grid">
-              <div class="info-row"><span class="info-label">${icon('mail', 'ic-16')} Email</span><span>${lead.email}</span></div>
-              <div class="info-row"><span class="info-label">${icon('phone', 'ic-16')} Phone</span><span>${lead.phone}</span></div>
-              <div class="info-row"><span class="info-label">${icon('globe', 'ic-16')} Company</span><span>${lead.company}</span></div>
-              <div class="info-row"><span class="info-label">${icon('mapPin', 'ic-16')} Location</span><span>${lead.location}</span></div>
-              <div class="info-row"><span class="info-label">${icon('tag', 'ic-16')} Industry</span><span>${lead.industry}</span></div>
-              <div class="info-row"><span class="info-label">${icon('link', 'ic-16')} Source</span><span>${lead.source}</span></div>
+              <div class="info-row"><span class="info-label">${icon('mail', 'ic-16')} Email</span><span>${escapeHtml(lead.email)}</span></div>
+              <div class="info-row"><span class="info-label">${icon('phone', 'ic-16')} Phone</span><span>${escapeHtml(lead.phone)}</span></div>
+              <div class="info-row"><span class="info-label">${icon('globe', 'ic-16')} Company</span><span>${escapeHtml(lead.company)}</span></div>
+              <div class="info-row"><span class="info-label">${icon('mapPin', 'ic-16')} Location</span><span>${escapeHtml(lead.location)}</span></div>
+              <div class="info-row"><span class="info-label">${icon('tag', 'ic-16')} Industry</span><span>${escapeHtml(lead.industry)}</span></div>
+              <div class="info-row"><span class="info-label">${icon('link', 'ic-16')} Source</span><span>${escapeHtml(lead.source)}</span></div>
             </div>
           </div>
         </div>
@@ -169,7 +169,7 @@ function renderLeadDetail(id) {
           </div>
           <div class="card-body">
             <div class="chips">
-              ${lead.tags.map(t => `<span class="chip on">${t}</span>`).join('')}
+              ${lead.tags.map(t => `<span class="chip on">${escapeHtml(t)}</span>`).join('')}
               <button class="chip" data-action="add-tag">${icon('plus', 'ic-14')} Add</button>
             </div>
           </div>
@@ -209,7 +209,7 @@ function renderLeadDetail(id) {
               <div class="act-item">
                 <div class="act-ic ${getActivityIconCls(a.type)}">${icon(getActivityIcon(a.type))}</div>
                 <div class="act-body">
-                  <div>${a.description}</div>
+                  <div>${escapeHtml(a.description)}</div>
                   <time>${UI.formatDate(a.timestamp)}</time>
                 </div>
               </div>
@@ -254,7 +254,37 @@ function bindLeadsEvents() {
 
   UI.on('#lead-search', 'input', (e) => {
     Store.setSearch(e.target.value);
-    renderLeads();
+    const filteredLeads = Store.getLeads();
+    const tbody = document.querySelector('#view .tbl tbody');
+    if (tbody) {
+      tbody.innerHTML = filteredLeads.map(l => `
+              <tr class="row-click" data-lead="${l.id}">
+                <td>
+                  <div class="row">
+                    ${avatar(l.name, 'sm')}
+                    <div>
+                      <div class="cell-main">${escapeHtml(l.name)}</div>
+                      <div class="cell-sub">${escapeHtml(l.email)}</div>
+                    </div>
+                  </div>
+                </td>
+                <td>${escapeHtml(l.company)}</td>
+                <td>${statusBadge(l.status)}</td>
+                <td>${priorityTag(l.priority)}</td>
+                <td>${ring(l.score, 'sm')}</td>
+                <td><span class="target-chip">${icon('link', 'ic-14')} ${escapeHtml(l.source)}</span></td>
+                <td>${UI.formatDate(l.lastActivity)}</td>
+                <td>
+                  <div class="td-actions">
+                    <button class="ibtn" data-lead-view="${l.id}">${icon('eye', 'ic-14')}</button>
+                    <button class="ibtn" data-lead-delete="${l.id}">${icon('trash', 'ic-14')}</button>
+                  </div>
+                </td>
+              </tr>
+            `).join('');
+      const resCount = document.querySelector('#view .res-count');
+      if (resCount) resCount.textContent = filteredLeads.length + ' results';
+    }
   });
 
   UI.delegate('#view', '[data-filter-key]', 'change', (e, el) => {
@@ -302,6 +332,15 @@ function bindLeadDetailEvents(lead) {
 
   UI.delegate('#view', '[data-action="edit-lead"]', 'click', () => {
     UI.toast('Lead editor would open here.');
+  });
+
+  UI.delegate('#view', '[data-action="add-tag"]', 'click', () => {
+    const tag = prompt('Enter tag name:');
+    if (tag && tag.trim()) {
+      Store.updateLead(lead.id, { tags: [...lead.tags, tag.trim()] });
+      UI.toast(`Tag "${tag.trim()}" added.`);
+      renderLeadDetail(lead.id);
+    }
   });
 }
 

@@ -207,6 +207,9 @@ function bindSettingsEvents() {
       settings[map[id]] = e.target.checked;
       Store.set('settings', settings);
     }
+    if (id === 's-darkmode') {
+      document.documentElement.setAttribute('data-theme', e.target.checked ? 'dark' : 'light');
+    }
     UI.toast('Preference updated.');
   });
 

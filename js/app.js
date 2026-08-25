@@ -15,6 +15,9 @@ function navigateTo(view) {
 
 document.addEventListener('DOMContentLoaded', () => {
   Store.init();
+  if (Store.get('settings').darkMode) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
 
   UI.buildSidebar();
   UI.buildTopbar();
@@ -33,13 +36,4 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   navigateTo('dashboard');
-
-  document.querySelectorAll('[data-nav]').forEach(el => {
-    if (!el.closest('.sidebar') && !el.closest('.topbar')) {
-      el.addEventListener('click', (e) => {
-        e.preventDefault();
-        Store.navigate(el.dataset.nav);
-      });
-    }
-  });
 });

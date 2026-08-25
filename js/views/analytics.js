@@ -24,7 +24,7 @@ function renderAnalytics() {
         <p class="page-sub">Performance insights across your lead engine.</p>
       </div>
       <div class="page-actions">
-        <button class="btn btn-secondary">${icon('download')} Export Report</button>
+        <button class="btn btn-secondary" data-action="export-report">${icon('download')} Export Report</button>
       </div>
     </div>
 
@@ -124,7 +124,7 @@ function renderAnalytics() {
                   const replyRate = Math.round((c.replied / c.sent) * 100);
                   return `
                     <tr>
-                      <td><div class="cell-main" style="font-size:12.5px">${c.name}</div></td>
+                      <td><div class="cell-main" style="font-size:12.5px">${escapeHtml(c.name)}</div></td>
                       <td>${campaignBadge(c.status)}</td>
                       <td>${c.sent}</td>
                       <td>${openRate}%</td>
@@ -139,4 +139,7 @@ function renderAnalytics() {
     </div>`;
 
   UI.renderView(html);
+  UI.delegate('#view', '[data-action="export-report"]', 'click', () => {
+    UI.toast('Export started — download will begin shortly.');
+  });
 }

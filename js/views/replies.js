@@ -50,8 +50,8 @@ function repliesList(replies) {
         <div class="row" style="gap:12px">
           ${avatar(r.leadName)}
           <div>
-            <div class="cell-main">${r.leadName}</div>
-            <div class="cell-sub">${r.company}</div>
+            <div class="cell-main">${escapeHtml(r.leadName)}</div>
+            <div class="cell-sub">${escapeHtml(r.company)}</div>
           </div>
         </div>
         <div class="row" style="gap:8px">
@@ -60,8 +60,8 @@ function repliesList(replies) {
         </div>
       </div>
       <div class="reply-body">
-        <div class="reply-subject">${icon('mail', 'ic-16')} ${r.subject}</div>
-        <p class="reply-text">${r.body}</p>
+        <div class="reply-subject">${icon('mail', 'ic-16')} ${escapeHtml(r.subject)}</div>
+        <p class="reply-text">${escapeHtml(r.body)}</p>
       </div>
       <div class="reply-actions">
         <button class="btn btn-sm btn-primary" data-reply-action="reply" data-rid="${r.id}">${icon('reply')} Reply</button>
@@ -128,7 +128,7 @@ function showReplyComposer(reply) {
       </div>
       <div class="form-group">
         <label>Original Message</label>
-        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;color:var(--text-2);max-height:120px;overflow-y:auto">${reply.body}</div>
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;color:var(--text-2);max-height:120px;overflow-y:auto">${escapeHtml(reply.body)}</div>
       </div>
       <div class="form-group">
         <label>Your Reply</label>
@@ -142,17 +142,15 @@ function showReplyComposer(reply) {
 
   UI.modal(`Reply to ${reply.leadName}`, body, { wide: true, footer });
 
-  setTimeout(() => {
-    UI.on('#send-reply-btn', 'click', () => {
-      const body = document.getElementById('reply-body').value.trim();
-      if (!body) return UI.toast('Please write a reply.', 'error');
-      Store.markReplyRead(reply.id);
-      UI.closeModal();
-      UI.toast(`Reply sent to ${reply.leadName}.`);
-      renderReplies();
-      UI.buildSidebar();
-    });
-  }, 50);
+  UI.on('#send-reply-btn', 'click', () => {
+    const body = document.getElementById('reply-body').value.trim();
+    if (!body) return UI.toast('Please write a reply.', 'error');
+    Store.markReplyRead(reply.id);
+    UI.closeModal();
+    UI.toast(`Reply sent to ${reply.leadName}.`);
+    renderReplies();
+    UI.buildSidebar();
+  });
 }
 
 function showForwardComposer(reply) {
@@ -168,7 +166,7 @@ function showForwardComposer(reply) {
       </div>
       <div class="form-group">
         <label>Original Message</label>
-        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;color:var(--text-2);max-height:120px;overflow-y:auto">${reply.body}</div>
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;color:var(--text-2);max-height:120px;overflow-y:auto">${escapeHtml(reply.body)}</div>
       </div>
       <div class="form-group">
         <label>Add a Note (optional)</label>
@@ -182,15 +180,13 @@ function showForwardComposer(reply) {
 
   UI.modal(`Forward Reply from ${reply.leadName}`, body, { wide: true, footer });
 
-  setTimeout(() => {
-    UI.on('#send-forward-btn', 'click', () => {
-      const to = document.getElementById('forward-to').value.trim();
-      if (!to) return UI.toast('Please enter an email address.', 'error');
-      UI.closeModal();
-      UI.toast(`Reply forwarded to ${to}.`);
-      Store.markReplyRead(reply.id);
-      renderReplies();
-      UI.buildSidebar();
-    });
-  }, 50);
+  UI.on('#send-forward-btn', 'click', () => {
+    const to = document.getElementById('forward-to').value.trim();
+    if (!to) return UI.toast('Please enter an email address.', 'error');
+    UI.closeModal();
+    UI.toast(`Reply forwarded to ${to}.`);
+    Store.markReplyRead(reply.id);
+    renderReplies();
+    UI.buildSidebar();
+  });
 }

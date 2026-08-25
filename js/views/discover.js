@@ -60,15 +60,15 @@ function discoverRows(leads) {
         <div class="row">
           ${avatar(l.name, 'sm')}
           <div>
-            <div class="cell-main">${l.name}</div>
-            <div class="cell-sub">${l.title}</div>
+            <div class="cell-main">${escapeHtml(l.name)}</div>
+            <div class="cell-sub">${escapeHtml(l.title)}</div>
           </div>
         </div>
       </td>
-      <td>${l.company}</td>
-      <td><span class="target-chip">${icon('globe', 'ic-14')} ${l.industry}</span></td>
-      <td>${l.location}</td>
-      <td><span class="target-chip">${icon('link', 'ic-14')} ${l.source}</span></td>
+      <td>${escapeHtml(l.company)}</td>
+      <td><span class="target-chip">${icon('globe', 'ic-14')} ${escapeHtml(l.industry)}</span></td>
+      <td>${escapeHtml(l.location)}</td>
+      <td><span class="target-chip">${icon('link', 'ic-14')} ${escapeHtml(l.source)}</span></td>
       <td>${ring(l.score, 'sm')}</td>
       <td>
         <div class="td-actions">
@@ -100,6 +100,7 @@ function bindDiscoverEvents(leads) {
   });
 
   UI.delegate('#view', '#refresh-discover', 'click', () => {
+    Store._state.discover = generateDiscoverLeads();
     UI.toast('Discover refreshed with new prospects.');
     renderDiscover();
   });

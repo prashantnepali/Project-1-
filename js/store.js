@@ -110,6 +110,14 @@ const Store = {
     return this._state.campaigns.find(c => c.id === id);
   },
 
+  updateCampaign(id, updates) {
+    const idx = this._state.campaigns.findIndex(c => c.id === id);
+    if (idx !== -1) {
+      this._state.campaigns[idx] = { ...this._state.campaigns[idx], ...updates };
+      this._emit('campaigns', this._state.campaigns);
+    }
+  },
+
   getReplies() {
     return [...this._state.replies];
   },
@@ -143,7 +151,7 @@ const Store = {
         name: dl.name,
         firstName: dl.name.split(' ')[0],
         lastName: dl.name.split(' ').slice(1).join(' '),
-        email: dl.name.toLowerCase().replace(' ', '.') + '@' + dl.company.toLowerCase().replace(/[^a-z]/g, '') + '.com',
+        email: dl.name.toLowerCase().replace(/ /g, '.') + '@' + dl.company.toLowerCase().replace(/[^a-z]/g, '') + '.com',
         phone: '+91 ' + (7000000000 + Math.floor(Math.random() * 3000000000)),
         company: dl.company,
         title: dl.title,
@@ -187,7 +195,7 @@ const Store = {
       totalSent: campaigns.reduce((s, c) => s + c.sent, 0),
       totalOpened: campaigns.reduce((s, c) => s + c.opened, 0),
       totalReplied: replies.length,
-      avgScore: Math.round(leads.reduce((s, l) => s + l.score, 0) / leads.length),
+      avgScore: leads.length ? Math.round(leads.reduce((s, l) => s + l.score, 0) / leads.length) : 0,
       activeCampaigns: campaigns.filter(c => c.status === 'active').length,
       responseRate: Math.round((replies.length / Math.max(1, campaigns.reduce((s, c) => s + c.sent, 0))) * 100),
     };
