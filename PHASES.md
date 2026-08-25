@@ -1,6 +1,50 @@
 # Samparka Lead Engine — Phase History
 
-## Phase 1 — Static SPA Prototype (Vanilla JS)
+## What Happened in Phase 1 and 2
+
+### Phase 1 — Static SPA Prototype
+
+Built a complete lead intelligence **UI with mock data**. Vanilla HTML/CSS/JS, no backend, no dependencies.
+
+**Views built:** Dashboard, Leads (with detail panel, search, filters), Discover, Campaigns, Replies, Analytics, Settings.
+
+**Architecture:** Centralized Store (event-emitter), UI helpers (modals, toasts, dark mode), SVG icon library. Everything ran client-side with hardcoded mock data.
+
+**Commits:** `b9eab58` (initial) + `a355506` (16 bug fixes — XSS, search, dark mode, campaigns, etc.)
+
+---
+
+### Phase 2 — Real Backend + Lead Intelligence Engine
+
+Converted the mock SPA into a working international lead discovery and management system.
+
+**Backend built:**
+- Express server + SQLite (12 tables, WAL mode)
+- **OpenStreetMap/Overpass** — Discover real businesses worldwide by country, city, and type
+- **Tavily AI** — Enrich companies with intelligence, evidence, decision-maker research, digital presence, loyalty program detection
+- **Deduplication** — Match by domain, phone, normalized name, sourceId
+- **Prequalification** — 8 scoring checks
+- **Fit Score** — 7 weighted dimensions with visible breakdown bars
+- **Lead Service** — Full CRUD, search, filtering, metrics, activity tracking
+- 15 API endpoints
+
+**Frontend rebuilt (async):**
+- Discover → real Overpass search, batch process/qualify, individual enrich/add-to-leads
+- Leads → fetches from backend, server-side search/filter, company intelligence, contacts, fit breakdown, evidence, activity timeline, edit/add/delete/tags/notes
+- Dashboard → real metrics, pipeline, recent leads, activity feed
+- Analytics → real industry/source/status breakdowns
+
+**13 bugs fixed:** null crashes, falsy-zero coordinates, city filtering, breakdown bars, debounce leaks, duplicate event handlers, timestamp sorting, validation.
+
+**Commits:** `d1423d4` (full Phase 2) + `d83ffa5` (7 bug fixes)
+
+---
+
+**What's NOT built (Phase 3):** Email campaigns, LinkedIn/Twitter integration, settings persistence, export, real email tracking.
+
+---
+
+## Phase 1 Details — Static SPA Prototype (Vanilla JS)
 
 Built a fully functional lead intelligence UI with mock data. No build tools, no frameworks, no backend.
 
