@@ -57,8 +57,8 @@ router.get('/', (req, res) => {
 router.post('/process', async (req, res) => {
   try {
     const { resultIds } = req.body;
-    if (!resultIds || !resultIds.length) {
-      return res.status(400).json({ error: 'resultIds required' });
+    if (!Array.isArray(resultIds) || !resultIds.length) {
+      return res.status(400).json({ error: 'resultIds must be a non-empty array' });
     }
 
     const db = getDb();
@@ -71,7 +71,15 @@ router.post('/process', async (req, res) => {
     const normalizedResults = results.map(r => {
       const data = JSON.parse(r.normalizedData || '{}');
       return { ...data, id: r.id };
-    });
+    }).filter(r => r.name || r.brand || r.rawTags?.operator || r.address);
+
+    const skipped = results.length - normalizedResults.length;
+    for (const r of results) {
+      const data = JSON.parse(r.normalizedData || '{}');
+      if (!data.name && !data.brand && !data.rawTags?.operator && !data.address) {
+        db.prepare(`UPDATE discovery_results SET status = 'rejected' WHERE id = ?`).run(r.id);
+      }
+    }
 
     const deduplicated = findDuplicates(normalizedResults);
 
@@ -157,8 +165,8 @@ router.post('/:id/add-to-lead', async (req, res) => {
 router.post('/bulk-add', async (req, res) => {
   try {
     const { resultIds } = req.body;
-    if (!resultIds || !resultIds.length) {
-      return res.status(400).json({ error: 'resultIds required' });
+    if (!Array.isArray(resultIds) || !resultIds.length) {
+      return res.status(400).json({ error: 'resultIds must be a non-empty array' });
     }
 
     const db = getDb();

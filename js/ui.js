@@ -23,16 +23,30 @@ const UI = {
 
   on(el, evt, fn, opts) {
     if (typeof el === 'string') el = document.querySelector(el);
-    if (el) el.addEventListener(evt, fn, opts);
+    if (!el) return;
+    const key = `_on_${evt}`;
+    if (!el._onHandlers) el._onHandlers = {};
+    if (el._onHandlers[key]) {
+      el.removeEventListener(evt, el._onHandlers[key]);
+    }
+    el._onHandlers[key] = fn;
+    el.addEventListener(evt, fn, opts);
   },
 
   delegate(parent, sel, evt, fn) {
     if (typeof parent === 'string') parent = document.querySelector(parent);
     if (!parent) return;
-    parent.addEventListener(evt, e => {
+    const key = `_delegate_${sel}_${evt}`;
+    if (!parent._delegates) parent._delegates = {};
+    if (parent._delegates[key]) {
+      parent.removeEventListener(evt, parent._delegates[key]);
+    }
+    const handler = e => {
       const target = e.target.closest(sel);
       if (target && parent.contains(target)) fn(e, target);
-    });
+    };
+    parent._delegates[key] = handler;
+    parent.addEventListener(evt, handler);
   },
 
   formatDate(d) {

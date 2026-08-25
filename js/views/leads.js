@@ -399,6 +399,7 @@ function bindLeadsEvents() {
   UI.on('#lead-search', 'input', (e) => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(async () => {
+      if (Store.get('currentView') !== 'leads') return;
       Store.set('searchQuery', e.target.value);
       const filters = Store.get('filters');
       const params = {};

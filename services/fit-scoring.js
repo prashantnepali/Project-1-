@@ -67,18 +67,18 @@ function scoreIndustryFit(company, max) {
   const combined = `${industry} ${category}`;
 
   if (combined.includes('hotel') || combined.includes('hospitality') || combined.includes('resort')) {
-    return { points: max, reason: 'Hospitality business — high fit for Samparka' };
+    return { points: max, max, reason: 'Hospitality business — high fit for Samparka' };
   }
   if (combined.includes('restaurant') || combined.includes('cafe') || combined.includes('food') || combined.includes('beverage')) {
-    return { points: max, reason: 'Food & beverage business — high fit for Samparka' };
+    return { points: max, max, reason: 'Food & beverage business — high fit for Samparka' };
   }
   if (combined.includes('retail') || combined.includes('shop') || combined.includes('store')) {
-    return { points: Math.round(max * 0.8), reason: 'Retail business — good fit for Samparka' };
+    return { points: Math.round(max * 0.8), max, reason: 'Retail business — good fit for Samparka' };
   }
   if (combined.includes('fitness') || combined.includes('gym') || combined.includes('spa') || combined.includes('salon')) {
-    return { points: Math.round(max * 0.7), reason: 'Service business — moderate fit for Samparka' };
+    return { points: Math.round(max * 0.7), max, reason: 'Service business — moderate fit for Samparka' };
   }
-  return { points: Math.round(max * 0.3), reason: 'Industry may have limited repeat-customer potential' };
+  return { points: Math.round(max * 0.3), max, reason: 'Industry may have limited repeat-customer potential' };
 }
 
 function scoreRepeatPotential(company, enrichData, max) {
@@ -88,35 +88,35 @@ function scoreRepeatPotential(company, enrichData, max) {
 
   for (const term of INDUSTRIES_WITH_REPEAT) {
     if (combined.includes(term)) {
-      return { points: max, reason: 'High repeat-customer potential' };
+      return { points: max, max, reason: 'High repeat-customer potential' };
     }
   }
 
   if (enrichData.loyaltyProgram === 'detected') {
-    return { points: Math.round(max * 0.6), reason: 'Has repeat customers (loyalty program detected)' };
+    return { points: Math.round(max * 0.6), max, reason: 'Has repeat customers (loyalty program detected)' };
   }
 
-  return { points: Math.round(max * 0.4), reason: 'Moderate repeat-customer potential' };
+  return { points: Math.round(max * 0.4), max, reason: 'Moderate repeat-customer potential' };
 }
 
 function scoreLocations(company, enrichData, max) {
   const count = enrichData.numberOfLocations || company.numberOfLocations || 1;
-  if (count >= 5) return { points: max, reason: `${count} locations — high multi-location value` };
-  if (count >= 3) return { points: Math.round(max * 0.8), reason: `${count} locations — good multi-location value` };
-  if (count >= 2) return { points: Math.round(max * 0.5), reason: `${count} locations — moderate multi-location value` };
-  return { points: Math.round(max * 0.2), reason: 'Single location' };
+  if (count >= 5) return { points: max, max, reason: `${count} locations — high multi-location value` };
+  if (count >= 3) return { points: Math.round(max * 0.8), max, reason: `${count} locations — good multi-location value` };
+  if (count >= 2) return { points: Math.round(max * 0.5), max, reason: `${count} locations — moderate multi-location value` };
+  return { points: Math.round(max * 0.2), max, reason: 'Single location' };
 }
 
 function scoreDigitalPresence(company, enrichData, max) {
   const presence = enrichData.digitalPresence || 'unknown';
-  if (presence === 'strong') return { points: max, reason: 'Strong online presence' };
-  if (presence === 'moderate') return { points: Math.round(max * 0.6), reason: 'Moderate online presence' };
-  if (company.website) return { points: Math.round(max * 0.5), reason: 'Has website' };
-  return { points: Math.round(max * 0.2), reason: 'Weak or unknown digital presence' };
+  if (presence === 'strong') return { points: max, max, reason: 'Strong online presence' };
+  if (presence === 'moderate') return { points: Math.round(max * 0.6), max, reason: 'Moderate online presence' };
+  if (company.website) return { points: Math.round(max * 0.5), max, reason: 'Has website' };
+  return { points: Math.round(max * 0.2), max, reason: 'Weak or unknown digital presence' };
 }
 
 function scoreDecisionMaker(contacts, max) {
-  if (!contacts.length) return { points: 0, reason: 'No decision-makers identified' };
+  if (!contacts.length) return { points: 0, max, reason: 'No decision-makers identified' };
 
   const highValueTitles = [
     'ceo', 'cto', 'cmo', 'coo', 'founder', 'co-founder',
@@ -129,9 +129,9 @@ function scoreDecisionMaker(contacts, max) {
     return highValueTitles.some(t => title.includes(t));
   });
 
-  if (hasKeyDecisionMaker) return { points: max, reason: 'Key decision-maker identified' };
-  if (contacts.length >= 2) return { points: Math.round(max * 0.6), reason: `${contacts.length} contacts found` };
-  return { points: Math.round(max * 0.3), reason: 'Contact found but not a key decision-maker' };
+  if (hasKeyDecisionMaker) return { points: max, max, reason: 'Key decision-maker identified' };
+  if (contacts.length >= 2) return { points: Math.round(max * 0.6), max, reason: `${contacts.length} contacts found` };
+  return { points: Math.round(max * 0.3), max, reason: 'Contact found but not a key decision-maker' };
 }
 
 function scoreContactInfo(company, contacts, max) {
@@ -144,17 +144,17 @@ function scoreContactInfo(company, contacts, max) {
     : points >= 3 ? 'Some contact information available'
     : 'Limited contact information';
 
-  return { points: Math.min(points, max), reason };
+  return { points: Math.min(points, max), max, reason };
 }
 
 function scoreNoLoyalty(enrichData, max) {
   if (enrichData.loyaltyProgram === 'none_detected') {
-    return { points: max, reason: 'No existing loyalty program detected — opportunity for Samparka' };
+    return { points: max, max, reason: 'No existing loyalty program detected — opportunity for Samparka' };
   }
   if (enrichData.loyaltyProgram === 'detected') {
-    return { points: 0, reason: 'Existing loyalty program detected — may be harder to convert' };
+    return { points: 0, max, reason: 'Existing loyalty program detected — may be harder to convert' };
   }
-  return { points: Math.round(max * 0.5), reason: 'Loyalty program status unknown' };
+  return { points: Math.round(max * 0.5), max, reason: 'Loyalty program status unknown' };
 }
 
 function classify(score) {

@@ -65,10 +65,10 @@ const Store = {
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       leads = leads.filter(l =>
-        l.name.toLowerCase().includes(q) ||
-        l.company.toLowerCase().includes(q) ||
-        l.email.toLowerCase().includes(q) ||
-        l.title.toLowerCase().includes(q)
+        (l.name || '').toLowerCase().includes(q) ||
+        (l.company || '').toLowerCase().includes(q) ||
+        (l.email || '').toLowerCase().includes(q) ||
+        (l.title || '').toLowerCase().includes(q)
       );
     }
 
@@ -135,7 +135,7 @@ const Store = {
   },
 
   getActivities() {
-    return [...this._state.activities].sort((a, b) => b.timestamp - a.timestamp);
+    return [...this._state.activities].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   },
 
   getDiscoverLeads() {

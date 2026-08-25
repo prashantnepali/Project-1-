@@ -61,14 +61,21 @@ function createCompany(normalizedResult) {
   const db = getDb();
   const id = genId();
 
+  const name = normalizedResult.name
+    || normalizedResult.brand
+    || normalizedResult.rawTags?.operator
+    || normalizedResult.rawTags?.description?.split(/[.,]/)[0]
+    || normalizedResult.address
+    || 'Unknown Business';
+
   db.prepare(`
     INSERT INTO companies (id, name, normalizedName, category, industry, country, city,
       address, latitude, longitude, website, phone, email, brand, source, sourceId, domain, status)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'discovered')
   `).run(
     id,
-    normalizedResult.name,
-    normalizeCompanyName(normalizedResult.name),
+    name,
+    normalizeCompanyName(name),
     normalizedResult.category,
     normalizedResult.industry,
     normalizedResult.country,

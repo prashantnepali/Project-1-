@@ -55,7 +55,7 @@ function buildOverpassQuery(city, country, businessType) {
     const [key, val] = tag.split('=');
     const tagFilter = val ? `["${key}"="${val}"]` : `["${key}"]`;
 
-    if (countryCode && city) {
+    if (city) {
       unionParts.push(`node${tagFilter}(area.searchArea)`);
       unionParts.push(`way${tagFilter}(area.searchArea)`);
     } else if (countryCode) {
@@ -67,9 +67,15 @@ function buildOverpassQuery(city, country, businessType) {
     }
   }
 
-  const areaDecl = countryCode
-    ? `area["ISO3166-1"="${countryCode.toUpperCase()}"]->.searchArea;`
-    : '';
+  let areaDecl = '';
+  if (city && countryCode) {
+    areaDecl = `area["ISO3166-1"="${countryCode.toUpperCase()}"]->.countryArea;
+area["name"="${city}"]["boundary"="administrative"](area.countryArea)->.searchArea;`;
+  } else if (city) {
+    areaDecl = `area["name"="${city}"]["boundary"="administrative"]->.searchArea;`;
+  } else if (countryCode) {
+    areaDecl = `area["ISO3166-1"="${countryCode.toUpperCase()}"]->.searchArea;`;
+  }
 
   return `
 [out:json][timeout:60];
@@ -120,8 +126,8 @@ async function search(city, country, businessType, options = {}) {
       country: country,
       city: city || el.tags?.['addr:city'] || null,
       address: buildAddress(el.tags),
-      latitude: el.lat || el.center?.lat || null,
-      longitude: el.lon || el.center?.lon || null,
+      latitude: el.lat != null ? el.lat : (el.center?.lat != null ? el.center.lat : null),
+      longitude: el.lon != null ? el.lon : (el.center?.lon != null ? el.center.lon : null),
       website: el.tags?.website || el.tags?.['contact:website'] || null,
       phone: el.tags?.phone || el.tags?.['contact:phone'] || null,
       email: el.tags?.email || el.tags?.['contact:email'] || null,
