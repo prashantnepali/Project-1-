@@ -148,8 +148,9 @@ const UI = {
     const unread = Store.getUnreadRepliesCount();
     const current = Store.get('currentView');
     const settings = Store.get('settings');
-    const profileName = settings.profileName || 'Prashant Kumar';
-    const profileEmail = settings.profileEmail || 'prashant@samparka.io';
+    const currentUser = Store.get('currentUser');
+    const profileName = currentUser?.name || settings.profileName || 'Guest';
+    const profileEmail = currentUser?.email || settings.profileEmail || '';
 
     sb.innerHTML = `
       <div class="sb-brand">
@@ -187,6 +188,9 @@ const UI = {
         </a>
 
         <div class="sb-sect">System</div>
+        <a href="#" class="nav-item ${current === 'team' ? 'active' : ''}" data-nav="team">
+          ${icon('users')} Team
+        </a>
         <a href="#" class="nav-item ${current === 'settings' ? 'active' : ''}" data-nav="settings">
           ${icon('settings')} Settings
         </a>
@@ -230,9 +234,11 @@ const UI = {
       } else if (action === 'docs') {
         UI.toast('Documentation would open here.');
       } else if (action === 'signout') {
-        Store.init();
+        Auth.logout();
+        Store._state.currentUser = null;
         UI.buildSidebar();
-        Store.navigate('dashboard');
+        UI.buildTopbar();
+        navigateTo('auth');
         UI.toast('Signed out successfully.');
       }
     });

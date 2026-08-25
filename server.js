@@ -15,6 +15,8 @@ app.use(express.static(path.join(__dirname)));
 
 initSchema();
 
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/teams', require('./routes/teams'));
 app.use('/api/discover', require('./routes/discovery'));
 app.use('/api/prospects', require('./routes/prospects'));
 app.use('/api/leads', require('./routes/leads'));

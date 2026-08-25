@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { getActivities } = require('../services/activity-service');
+const { auth } = require('../middleware/auth');
+
+router.use(auth);
 
 router.get('/', (req, res) => {
   try {

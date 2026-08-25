@@ -5,6 +5,7 @@ const Store = {
   init() {
     this._state = {
       currentView: 'dashboard',
+      currentUser: Auth.isLoggedIn ? Auth.user : null,
       leads: [...MOCK_LEADS],
       campaigns: [...MOCK_CAMPAIGNS],
       activities: [...MOCK_ACTIVITIES],

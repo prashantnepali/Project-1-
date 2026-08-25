@@ -3,12 +3,12 @@ const { genId, now } = require('./helpers');
 const { calculateFitScore } = require('./fit-scoring');
 const { researchContacts, getContactsByCompany } = require('./contact-intelligence');
 
-async function addToLeads(companyId) {
+async function addToLeads(companyId, userId) {
   const db = getDb();
   const company = db.prepare(`SELECT * FROM companies WHERE id = ?`).get(companyId);
   if (!company) throw new Error('Company not found');
 
-  const existing = db.prepare(`SELECT id FROM leads WHERE companyId = ?`).get(companyId);
+  const existing = db.prepare(`SELECT id FROM leads WHERE companyId = ? AND userId = ?`).get(companyId, userId);
   if (existing) throw new Error('Company is already a lead');
 
   let fitScore = db.prepare(`SELECT * FROM lead_scores WHERE companyId = ? ORDER BY calculatedAt DESC LIMIT 1`).get(companyId);
@@ -26,8 +26,8 @@ async function addToLeads(companyId) {
 
   db.prepare(`
     INSERT INTO leads (id, companyId, name, firstName, lastName, email, phone, company, title,
-      industry, location, source, status, priority, score, fitScoreId, createdAt, lastActivity)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, ?)
+      industry, location, source, status, priority, score, fitScoreId, userId, createdAt, lastActivity)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, ?, ?)
   `).run(
     leadId,
     companyId,
@@ -44,6 +44,7 @@ async function addToLeads(companyId) {
     fitScore.totalScore >= 60 ? 'medium' : 'low',
     fitScore.totalScore,
     fitScore.id,
+    userId,
     now(),
     now()
   );
@@ -80,9 +81,9 @@ function getLeads(filters = {}) {
     SELECT l.*, ls.totalScore as fitScore, ls.classification as fitClassification, ls.breakdown as fitBreakdown
     FROM leads l
     LEFT JOIN lead_scores ls ON l.fitScoreId = ls.id
-    WHERE 1=1
+    WHERE l.userId = ?
   `;
-  const params = [];
+  const params = [filters.userId];
 
   if (filters.search) {
     query += ` AND (l.name LIKE ? OR l.company LIKE ? OR l.email LIKE ?)`;
@@ -120,14 +121,14 @@ function getLeads(filters = {}) {
   return db.prepare(query).all(...params);
 }
 
-function getLeadById(id) {
+function getLeadById(id, userId) {
   const db = getDb();
   const lead = db.prepare(`
     SELECT l.*, ls.totalScore as fitScore, ls.classification as fitClassification, ls.breakdown as fitBreakdown
     FROM leads l
     LEFT JOIN lead_scores ls ON l.fitScoreId = ls.id
-    WHERE l.id = ?
-  `).get(id);
+    WHERE l.id = ? AND l.userId = ?
+  `).get(id, userId);
 
   if (!lead) return null;
 
@@ -148,8 +149,12 @@ function getLeadById(id) {
   };
 }
 
-function updateLead(id, updates) {
+function updateLead(id, updates, userId) {
   const db = getDb();
+
+  const existing = db.prepare(`SELECT id FROM leads WHERE id = ? AND userId = ?`).get(id, userId);
+  if (!existing) return null;
+
   const fields = [];
   const params = [];
 
@@ -172,12 +177,12 @@ function updateLead(id, updates) {
 
   db.prepare(`UPDATE leads SET ${fields.join(', ')} WHERE id = ?`).run(...params);
 
-  return getLeadById(id);
+  return getLeadById(id, userId);
 }
 
-function deleteLead(id) {
+function deleteLead(id, userId) {
   const db = getDb();
-  db.prepare(`DELETE FROM leads WHERE id = ?`).run(id);
+  db.prepare(`DELETE FROM leads WHERE id = ? AND userId = ?`).run(id, userId);
 }
 
 function addManualLead(data) {
@@ -188,28 +193,29 @@ function addManualLead(data) {
 
   db.prepare(`
     INSERT INTO leads (id, name, firstName, lastName, email, phone, company, title,
-      industry, location, source, status, priority, score, tags, notes, createdAt, lastActivity)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, ?, ?)
+      industry, location, source, status, priority, score, tags, notes, userId, createdAt, lastActivity)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, name, name.split(' ')[0], name.split(' ').slice(1).join(' '),
     data.email, data.phone, data.company, data.title,
     data.industry, data.location, data.source,
     data.priority || 'medium', data.score || 50,
     JSON.stringify(tags), data.notes || '',
+    data.userId,
     now(), now()
   );
 
   addActivity(id, null, 'manual_add', `Manually added ${name} as lead`);
 
-  return getLeadById(id);
+  return getLeadById(id, data.userId);
 }
 
-function getMetrics() {
+function getMetrics(userId) {
   const db = getDb();
-  const total = db.prepare(`SELECT COUNT(*) as c FROM leads`).get().c;
-  const newLeads = db.prepare(`SELECT COUNT(*) as c FROM leads WHERE status = 'new'`).get().c;
-  const qualified = db.prepare(`SELECT COUNT(*) as c FROM leads WHERE status = 'qualified'`).get().c;
-  const avgScore = db.prepare(`SELECT AVG(score) as avg FROM leads`).get().avg || 0;
+  const total = db.prepare(`SELECT COUNT(*) as c FROM leads WHERE userId = ?`).get(userId).c;
+  const newLeads = db.prepare(`SELECT COUNT(*) as c FROM leads WHERE status = 'new' AND userId = ?`).get(userId).c;
+  const qualified = db.prepare(`SELECT COUNT(*) as c FROM leads WHERE status = 'qualified' AND userId = ?`).get(userId).c;
+  const avgScore = db.prepare(`SELECT AVG(score) as avg FROM leads WHERE userId = ?`).get(userId).avg || 0;
 
   return {
     totalLeads: total,
