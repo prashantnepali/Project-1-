@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Samparka Lead Engine — internal lead intelligence and outreach prototype (Phase 1).">
+  <title>Samparka Lead Engine</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%3E%3Crect%20width='24'%20height='24'%20rx='6'%20fill='%23ea580c'/%3E%3Cpath%20d='M13%204%205.5%2013.5h5L10%2020l7.5-9.5h-5L13%204z'%20fill='white'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar" aria-label="Main navigation"></aside>
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <main class="main">
+      <header class="topbar" id="topbar"></header>
+      <div class="view" id="view">
+        <noscript><div class="notice n-warn"><p>Samparka Lead Engine needs JavaScript enabled to run.</p></div></noscript>
+      </div>
+    </main>
+  </div>
+  <div id="modal-root"></div>
+  <div id="toast-root" aria-live="polite"></div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/data/mock-data.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/views/dashboard.js"></script>
+  <script src="js/views/discover.js"></script>
+  <script src="js/views/leads.js"></script>
+  <script src="js/views/campaigns.js"></script>
+  <script src="js/views/replies.js"></script>
+  <script src="js/views/analytics.js"></script>
+  <script src="js/views/settings.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
