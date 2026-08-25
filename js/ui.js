@@ -144,7 +144,7 @@ const UI = {
           <div class="sb-name">Samparka</div>
           <div class="sb-tag">Lead Engine</div>
         </div>
-        <span class="ph-badge">PHASE 1</span>
+        <span class="ph-badge">PHASE 2</span>
       </div>
       <nav class="sb-nav">
         <div class="sb-sect">Overview</div>
@@ -218,7 +218,7 @@ const UI = {
       } else if (action === 'signout') {
         Store.init();
         UI.buildSidebar();
-        UI.navigate('dashboard');
+        Store.navigate('dashboard');
         UI.toast('Signed out successfully.');
       }
     });

@@ -8,9 +8,16 @@ const VIEWS = {
   settings: renderSettings,
 };
 
-function navigateTo(view) {
+async function navigateTo(view) {
   const renderFn = VIEWS[view];
-  if (renderFn) renderFn();
+  if (renderFn) {
+    try {
+      await renderFn();
+    } catch (err) {
+      console.error(`[App] Error rendering ${view}:`, err);
+      UI.toast(`Failed to load ${view}: ${err.message}`, 'error');
+    }
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
