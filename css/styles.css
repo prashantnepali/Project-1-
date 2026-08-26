@@ -324,7 +324,6 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
   box-shadow: var(--shadow-sm);
 }
 
-.card-pad { padding: 20px; }
 .card-head {
   display: flex;
   align-items: flex-start;
@@ -496,7 +495,6 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 .act-body { flex: 1; min-width: 0; }
 .act-ic { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex-shrink: 0; }
 .act-ic .ic { width: 15px; height: 15px; }
-.act-chev { color: var(--text-3); }
 
 .funnel { padding: 18px 20px; display: flex; flex-direction: column; gap: 9px; }
 .fn-row { display: flex; align-items: center; gap: 12px; }
@@ -541,7 +539,6 @@ input, select, textarea { font-family: inherit; font-size: 14px; color: var(--te
 .st-prop { background: var(--pink-soft); color: var(--pink); }
 .st-cust { background: var(--green-soft); color: var(--green); }
 .st-exit { background: #e5e7eb; color: #374151; }
-.st-exit2 { background: var(--slate-soft); color: var(--text-3); }
 .st-dnc { background: var(--red-soft); color: var(--red); }
 .st-res { background: var(--green-soft); color: var(--green); }
 

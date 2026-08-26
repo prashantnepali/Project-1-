@@ -13,7 +13,6 @@ router.post('/', async (req, res) => {
     const result = await discoveryService.runSearch({ country, city, industry, businessType, minScore });
     res.json(result);
   } catch (err) {
-    console.error('[API] Discovery error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

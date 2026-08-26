@@ -1,4 +1,5 @@
 async function renderLeads() {
+  const gen = getRenderGeneration();
   const selectedLeadId = Store.get('selectedLeadId');
   if (selectedLeadId) {
     return renderLeadDetail(selectedLeadId);
@@ -96,6 +97,7 @@ async function renderLeads() {
       </div>
     </div>`;
 
+  if (gen !== getRenderGeneration()) return;
   UI.renderView(html);
   bindLeadsEvents();
 }
@@ -399,7 +401,8 @@ function bindLeadsEvents() {
   UI.on('#lead-search', 'input', (e) => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(async () => {
-      if (Store.get('currentView') !== 'leads') return;
+      const searchBox = document.getElementById('lead-search');
+      if (!searchBox || Store.get('currentView') !== 'leads') return;
       Store.set('searchQuery', e.target.value);
       const filters = Store.get('filters');
       const params = {};

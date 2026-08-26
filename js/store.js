@@ -190,7 +190,7 @@ const Store = {
       totalLeads: leads.length,
       newLeads: leads.filter(l => l.status === 'new').length,
       qualified: leads.filter(l => l.status === 'qualified').length,
-      inPipeline: leads.filter(l => PIPELINE.includes(l.status) && l.status !== 'new' && l.status !== 'customer').length,
+      inPipeline: leads.filter(l => l.status !== 'new' && l.status !== 'customer').length,
       customers: leads.filter(l => l.status === 'customer').length,
       totalSent: campaigns.reduce((s, c) => s + c.sent, 0),
       totalOpened: campaigns.reduce((s, c) => s + c.opened, 0),

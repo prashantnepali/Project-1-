@@ -1,3 +1,5 @@
+let _renderGeneration = 0;
+
 const VIEWS = {
   dashboard: renderDashboard,
   discover: renderDiscover,
@@ -8,13 +10,20 @@ const VIEWS = {
   settings: renderSettings,
 };
 
+function getRenderGeneration() {
+  return _renderGeneration;
+}
+
 async function navigateTo(view) {
+  const gen = ++_renderGeneration;
   const renderFn = VIEWS[view];
   if (renderFn) {
+    Store._state.currentView = view;
     try {
       await renderFn();
-      Store._state.currentView = view;
+      if (gen !== _renderGeneration) return;
     } catch (err) {
+      if (gen !== _renderGeneration) return;
       console.error(`[App] Error rendering ${view}:`, err);
       UI.toast(`Failed to load ${view}: ${err.message}`, 'error');
     }

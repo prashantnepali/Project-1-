@@ -1,3 +1,5 @@
+const { extractDomain } = require('./helpers');
+
 function normalize(rawResult) {
   const normalized = {
     name: cleanName(rawResult.name),
@@ -33,9 +35,9 @@ function normalizeName(name) {
   return name
     .toLowerCase()
     .replace(/['']/g, "'")
-    .replace(/[^a-z0-9'\s]/g, '')
+    .replace(/[^a-z0-9'\s\u4e00-\u9fff]/g, '')
     .replace(/\b(the|a|an)\b/g, '')
-    .replace(/\b(llc|ltd|inc|corp|co|gmbh|ag|pte|sdn|bhd)\b/g, '')
+    .replace(/\b(llc|ltd|inc|corp|co|gmbh|ag|pte|sdn|bhd|有限公司|有限责任公司)\b/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -60,15 +62,4 @@ function normalizePhone(phone) {
   return cleaned;
 }
 
-function extractDomain(url) {
-  if (!url) return null;
-  try {
-    let u = url.trim();
-    if (!u.startsWith('http')) u = `https://${u}`;
-    return new URL(u).hostname.replace(/^www\./, '');
-  } catch {
-    return null;
-  }
-}
-
-module.exports = { normalize, cleanName, normalizeName, normalizeUrl, normalizePhone, extractDomain };
+module.exports = { normalize, cleanName, normalizeName, normalizeUrl, normalizePhone };

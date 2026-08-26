@@ -15,7 +15,6 @@ async function enrichCompany(companyId) {
     const lastEnriched = new Date(existing.lastEnrichedAt);
     const hoursSince = (Date.now() - lastEnriched.getTime()) / (1000 * 60 * 60);
     if (hoursSince < 24) {
-      console.log(`[Enrichment] Company ${companyId} was enriched ${Math.round(hoursSince)}h ago, skipping`);
       return { enrichmentId: existing.id, cached: true, data: JSON.parse(existing.data || '{}') };
     }
   }
@@ -48,12 +47,8 @@ async function enrichCompany(companyId) {
 
     await storeEvidence(companyId, enrichmentId, tavilyResult.results);
 
-    console.log(`[Enrichment] Company ${company.name} enriched successfully`);
-
     return { enrichmentId, cached: false, data: enrichmentData };
   } catch (err) {
-    console.error(`[Enrichment] Error for ${company.name}:`, err.message);
-
     const fallbackData = {
       description: null,
       numberOfLocations: null,

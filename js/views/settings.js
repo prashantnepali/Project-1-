@@ -1,5 +1,13 @@
-function renderSettings() {
-  const settings = Store.get('settings');
+async function renderSettings() {
+  const gen = getRenderGeneration();
+  let settings = Store.get('settings');
+  try {
+    const serverSettings = await API.settings.get();
+    settings = { ...settings, ...serverSettings };
+    Store.set('settings', settings);
+  } catch (err) {
+    // fallback to in-memory settings
+  }
 
   const html = `
     <div class="page-head">
@@ -20,11 +28,11 @@ function renderSettings() {
               <div class="form-row">
                 <div class="form-group">
                   <label>Full Name</label>
-                  <input type="text" value="Prashant Kumar" id="s-name">
+                  <input type="text" value="${escapeHtml(settings.profileName || 'Prashant Kumar')}" id="s-name">
                 </div>
                 <div class="form-group">
                   <label>Email</label>
-                  <input type="email" value="prashant@samparka.io" id="s-email">
+                  <input type="email" value="${escapeHtml(settings.profileEmail || 'prashant@samparka.io')}" id="s-email">
                 </div>
               </div>
               <div class="form-group">
@@ -44,12 +52,12 @@ function renderSettings() {
             <div class="settings-form">
               <div class="form-group">
                 <label>Email Domain</label>
-                <input type="text" value="${settings.emailDomain}" id="s-domain">
+                <input type="text" value="${escapeHtml(settings.emailDomain || 'samparka.io')}" id="s-domain">
               </div>
               <div class="form-group">
                 <label>API Key</label>
                 <div class="row" style="gap:8px">
-                  <input type="password" value="${settings.apiKey || 'sk-xxxx-xxxx-xxxx'}" id="s-apikey" style="flex:1">
+                  <input type="password" value="${escapeHtml(settings.apiKey || '')}" id="s-apikey" placeholder="sk-xxxx-xxxx-xxxx" style="flex:1">
                   <button class="btn btn-sm btn-secondary" id="toggle-apikey">${icon('eye', 'ic-14')}</button>
                 </div>
               </div>
@@ -102,6 +110,21 @@ function renderSettings() {
 
         <div class="card">
           <div class="card-head">
+            <div class="card-title">${icon('mail')} Connected Email Accounts</div>
+          </div>
+          <div class="card-body">
+            <div id="connected-accounts-list">
+              <div class="muted small" style="text-align:center;padding:16px">Loading accounts...</div>
+            </div>
+            <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-primary" id="connect-gmail-btn">${icon('mail')} Connect Gmail</button>
+              <button class="btn btn-secondary" disabled title="Coming soon">Connect Outlook (coming soon)</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
             <div class="card-title">${icon('zap')} Integrations</div>
           </div>
           <div class="card-body">
@@ -126,26 +149,6 @@ function renderSettings() {
                 </div>
                 <button class="btn btn-sm btn-secondary" data-action="connect-integration" data-name="Twitter">Connect</button>
               </div>
-              <div class="integration-row">
-                <div class="row" style="gap:12px">
-                  <div class="int-icon">${icon('database')}</div>
-                  <div>
-                    <div class="toggle-label">HubSpot</div>
-                    <div class="toggle-desc">Sync leads with HubSpot CRM</div>
-                  </div>
-                </div>
-                <button class="btn btn-sm btn-secondary" data-action="connect-integration" data-name="HubSpot">Connect</button>
-              </div>
-              <div class="integration-row">
-                <div class="row" style="gap:12px">
-                  <div class="int-icon">${icon('database')}</div>
-                  <div>
-                    <div class="toggle-label">Salesforce</div>
-                    <div class="toggle-desc">Sync leads with Salesforce</div>
-                  </div>
-                </div>
-                <button class="btn btn-sm btn-secondary" data-action="connect-integration" data-name="Salesforce">Connect</button>
-              </div>
             </div>
           </div>
         </div>
@@ -167,12 +170,19 @@ function renderSettings() {
       </div>
     </div>`;
 
+  if (gen !== getRenderGeneration()) return;
   UI.renderView(html);
   bindSettingsEvents();
+  loadConnectedAccounts();
 }
 
 function bindSettingsEvents() {
-  UI.on('#save-profile', 'click', () => {
+  UI.on('#connect-gmail-btn', 'click', () => {
+    window.open('/auth/google', '_blank', 'width=500,height=600');
+    UI.toast('Complete Gmail authorization in the popup window.');
+  });
+
+  UI.on('#save-profile', async () => {
     const name = document.getElementById('s-name').value.trim();
     const email = document.getElementById('s-email').value.trim();
     if (!name || !email) return UI.toast('Name and email are required.', 'error');
@@ -180,10 +190,11 @@ function bindSettingsEvents() {
     settings.profileName = name;
     settings.profileEmail = email;
     Store.set('settings', settings);
+    try { await API.settings.update({ profileName: name, profileEmail: email }); } catch (e) {}
     UI.toast('Profile saved successfully.');
   });
 
-  UI.on('#save-email-settings', 'click', () => {
+  UI.on('#save-email-settings', async () => {
     const domain = document.getElementById('s-domain').value.trim();
     const apiKey = document.getElementById('s-apikey').value.trim();
     if (!domain) return UI.toast('Email domain is required.', 'error');
@@ -191,6 +202,7 @@ function bindSettingsEvents() {
     settings.emailDomain = domain;
     settings.apiKey = apiKey;
     Store.set('settings', settings);
+    try { await API.settings.update({ emailDomain: domain, apiKey }); } catch (e) {}
     UI.toast('Email settings saved.');
   });
 
@@ -199,16 +211,17 @@ function bindSettingsEvents() {
     input.type = input.type === 'password' ? 'text' : 'password';
   });
 
-  UI.delegate('#view', '.toggle input', 'change', (e) => {
+  UI.delegate('#view', '.toggle input', 'change', async (e) => {
     const id = e.target.id;
     const settings = Store.get('settings');
     const map = { 's-autoenrich': 'autoEnrich', 's-notifications': 'notifications', 's-darkmode': 'darkMode' };
     if (map[id]) {
       settings[map[id]] = e.target.checked;
       Store.set('settings', settings);
+      try { await API.settings.update({ [map[id]]: e.target.checked }); } catch (e) {}
     }
     if (id === 's-darkmode') {
-      document.documentElement.setAttribute('data-theme', e.target.checked ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', e.target.checked ? 'dark' : '');
     }
     UI.toast('Preference updated.');
   });
@@ -218,12 +231,59 @@ function bindSettingsEvents() {
     UI.toast(`${name} integration would connect here.`);
   });
 
-  UI.delegate('#view', '[data-action="delete-all"]', 'click', () => {
+  UI.delegate('#view', '[data-action="delete-all"]', 'click', async () => {
     if (confirm('Are you sure you want to delete all data? This cannot be undone.')) {
-      Store.init();
-      UI.toast('All data has been deleted.');
-      renderSettings();
-      UI.buildSidebar();
+      try {
+        await API.del('/data');
+        Store._state.leads = [];
+        Store._state.activities = [];
+        UI.toast('All data has been deleted.');
+        renderSettings();
+        UI.buildSidebar();
+      } catch (err) {
+        UI.toast('Failed to delete data: ' + err.message, 'error');
+      }
     }
   });
+}
+
+async function loadConnectedAccounts() {
+  const container = document.getElementById('connected-accounts-list');
+  if (!container) return;
+
+  try {
+    const accounts = await API.accounts.list();
+    if (!accounts.length) {
+      container.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-3);font-size:13px">No email accounts connected. Click "Connect Gmail" to get started.</div>';
+      return;
+    }
+
+    container.innerHTML = accounts.map(a => `
+      <div class="integration-row" style="border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px">
+        <div class="spread">
+          <div class="row" style="gap:12px">
+            <div class="int-icon">${icon('mail')}</div>
+            <div>
+              <div class="toggle-label">${escapeHtml(a.email)}</div>
+              <div class="toggle-desc">${escapeHtml(a.displayName || '')} · ${a.provider} · Connected ${UI.formatDate(a.connectedAt)}</div>
+            </div>
+          </div>
+          <button class="btn btn-sm btn-danger" data-action="disconnect-account" data-account-id="${a.id}">${icon('x')} Disconnect</button>
+        </div>
+      </div>
+    `).join('');
+
+    UI.delegate('#connected-accounts-list', '[data-action="disconnect-account"]', 'click', async (e, el) => {
+      if (!confirm('Disconnect this email account?')) return;
+      try {
+        await API.accounts.delete(el.dataset.accountId);
+        UI.toast('Account disconnected.');
+        loadConnectedAccounts();
+      } catch (err) {
+        UI.toast('Failed to disconnect: ' + err.message);
+      }
+    });
+  } catch (err) {
+    container.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-3);font-size:13px">Could not load accounts.</div>';
+  }
 }

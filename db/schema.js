@@ -168,6 +168,100 @@ function initSchema() {
       value TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS email_accounts (
+      id TEXT PRIMARY KEY,
+      provider TEXT NOT NULL DEFAULT 'google',
+      email TEXT NOT NULL,
+      displayName TEXT,
+      accessToken TEXT NOT NULL,
+      refreshToken TEXT NOT NULL,
+      tokenExpiry TEXT NOT NULL,
+      scope TEXT,
+      status TEXT DEFAULT 'active',
+      connectedAt TEXT DEFAULT (datetime('now')),
+      updatedAt TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS campaigns (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      accountId TEXT,
+      subject TEXT NOT NULL,
+      templateId TEXT,
+      body TEXT,
+      status TEXT DEFAULT 'draft',
+      targetFilter TEXT DEFAULT '{}',
+      sent INTEGER DEFAULT 0,
+      delivered INTEGER DEFAULT 0,
+      opened INTEGER DEFAULT 0,
+      clicked INTEGER DEFAULT 0,
+      replied INTEGER DEFAULT 0,
+      bounced INTEGER DEFAULT 0,
+      scheduledAt TEXT,
+      startedAt TEXT,
+      completedAt TEXT,
+      createdAt TEXT DEFAULT (datetime('now')),
+      updatedAt TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (accountId) REFERENCES email_accounts(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS campaign_leads (
+      campaignId TEXT NOT NULL,
+      leadId TEXT NOT NULL,
+      status TEXT DEFAULT 'pending',
+      sentAt TEXT,
+      openedAt TEXT,
+      repliedAt TEXT,
+      messageId TEXT,
+      PRIMARY KEY (campaignId, leadId),
+      FOREIGN KEY (campaignId) REFERENCES campaigns(id) ON DELETE CASCADE,
+      FOREIGN KEY (leadId) REFERENCES leads(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS email_sends (
+      id TEXT PRIMARY KEY,
+      campaignId TEXT,
+      leadId TEXT,
+      accountId TEXT NOT NULL,
+      toEmail TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      body TEXT,
+      messageId TEXT,
+      threadId TEXT,
+      status TEXT DEFAULT 'pending',
+      sentAt TEXT,
+      deliveredAt TEXT,
+      openedAt TEXT,
+      clickedAt TEXT,
+      bouncedAt TEXT,
+      error TEXT,
+      createdAt TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (campaignId) REFERENCES campaigns(id) ON DELETE SET NULL,
+      FOREIGN KEY (leadId) REFERENCES leads(id) ON DELETE SET NULL,
+      FOREIGN KEY (accountId) REFERENCES email_accounts(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS email_replies (
+      id TEXT PRIMARY KEY,
+      accountId TEXT NOT NULL,
+      leadId TEXT,
+      campaignId TEXT,
+      messageId TEXT NOT NULL,
+      threadId TEXT,
+      fromEmail TEXT,
+      toEmail TEXT,
+      subject TEXT,
+      body TEXT,
+      snippet TEXT,
+      sentiment TEXT DEFAULT 'neutral',
+      receivedAt TEXT,
+      processedAt TEXT,
+      createdAt TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (accountId) REFERENCES email_accounts(id) ON DELETE CASCADE,
+      FOREIGN KEY (leadId) REFERENCES leads(id) ON DELETE SET NULL,
+      FOREIGN KEY (campaignId) REFERENCES campaigns(id) ON DELETE SET NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_contacts_company ON contacts(companyId);
     CREATE INDEX IF NOT EXISTS idx_discovery_results_search ON discovery_results(searchId);
     CREATE INDEX IF NOT EXISTS idx_discovery_results_company ON discovery_results(companyId);
@@ -182,9 +276,32 @@ function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_evidence_enrichment ON evidence(enrichmentId);
     CREATE INDEX IF NOT EXISTS idx_companies_normalizedName ON companies(normalizedName);
     CREATE INDEX IF NOT EXISTS idx_companies_domain ON companies(domain);
-  `);
+    CREATE INDEX IF NOT EXISTS idx_email_accounts_email ON email_accounts(email);
+    CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns(status);
+    CREATE INDEX IF NOT EXISTS idx_campaign_leads_campaign ON campaign_leads(campaignId);
+    CREATE INDEX IF NOT EXISTS idx_campaign_leads_lead ON campaign_leads(leadId);
+    CREATE INDEX IF NOT EXISTS idx_email_sends_campaign ON email_sends(campaignId);
+    CREATE INDEX IF NOT EXISTS idx_email_sends_lead ON email_sends(leadId);
+    CREATE INDEX IF NOT EXISTS idx_email_sends_account ON email_sends(accountId);
+    CREATE INDEX IF NOT EXISTS idx_email_replies_account ON email_replies(accountId);
+    CREATE INDEX IF NOT EXISTS idx_email_replies_lead ON email_replies(leadId);
+    CREATE INDEX IF NOT EXISTS idx_email_replies_campaign ON email_replies(campaignId);
 
-  console.log('[DB] Schema initialized');
+    CREATE VIRTUAL TABLE IF NOT EXISTS leads_fts USING fts5(name, company, content='leads', content_rowid='rowid');
+
+    CREATE TRIGGER IF NOT EXISTS leads_ai AFTER INSERT ON leads BEGIN
+      INSERT INTO leads_fts(rowid, name, company) VALUES (new.rowid, new.name, new.company);
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS leads_ad AFTER DELETE ON leads BEGIN
+      INSERT INTO leads_fts(leads_fts, rowid, name, company) VALUES('delete', old.rowid, old.name, old.company);
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS leads_au AFTER UPDATE ON leads BEGIN
+      INSERT INTO leads_fts(leads_fts, rowid, name, company) VALUES('delete', old.rowid, old.name, old.company);
+      INSERT INTO leads_fts(rowid, name, company) VALUES (new.rowid, new.name, new.company);
+    END;
+  `);
 }
 
 module.exports = { initSchema };

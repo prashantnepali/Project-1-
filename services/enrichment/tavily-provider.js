@@ -12,8 +12,6 @@ async function search(query, options = {}) {
   const searchDepth = options.searchDepth || 'basic';
   const includeAnswer = options.includeAnswer !== false;
 
-  console.log(`[Tavily] Searching: "${query.slice(0, 80)}..."`);
-
   const response = await fetch(TAVILY_API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

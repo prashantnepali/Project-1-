@@ -1,4 +1,5 @@
 async function renderAnalytics() {
+  const gen = getRenderGeneration();
   let leads = Store.get('leads') || [];
   let metrics = { totalLeads: 0, newLeads: 0, qualified: 0, avgScore: 0 };
 
@@ -151,6 +152,7 @@ async function renderAnalytics() {
       </div>
     </div>`;
 
+  if (gen !== getRenderGeneration()) return;
   UI.renderView(html);
   UI.delegate('#view', '[data-action="export-report"]', 'click', () => {
     UI.toast('Export started — download will begin shortly.');

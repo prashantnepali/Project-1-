@@ -40,8 +40,6 @@ async function runSearch(params) {
       UPDATE discovery_searches SET resultCount = ?, status = 'completed' WHERE id = ?
     `).run(results.length, searchId);
 
-    console.log(`[Discovery] Search ${searchId}: ${results.length} results`);
-
     return { searchId, results, total: results.length };
   } catch (err) {
     db.prepare(`

@@ -88,4 +88,37 @@ const API = {
     get: () => API.get('/settings'),
     update: (data) => API.put('/settings', data),
   },
+
+  accounts: {
+    list: () => API.get('/accounts'),
+    delete: (id) => API.del(`/accounts/${id}`),
+  },
+
+  campaigns: {
+    list: (params) => {
+      const q = new URLSearchParams(params || {}).toString();
+      return API.get(`/campaigns${q ? '?' + q : ''}`);
+    },
+    get: (id) => API.get(`/campaigns/${id}`),
+    create: (data) => API.post('/campaigns', data),
+    update: (id, data) => API.put(`/campaigns/${id}`, data),
+    delete: (id) => API.del(`/campaigns/${id}`),
+    metrics: () => API.get('/campaigns/metrics'),
+    assignLeads: (id, leadIds) => API.post(`/campaigns/${id}/leads`, { leadIds }),
+    getLeads: (id) => API.get(`/campaigns/${id}/leads`),
+    send: (id) => API.post(`/campaigns/${id}/send`),
+  },
+
+  emails: {
+    send: (data) => API.post('/emails/send', data),
+    sends: (params) => {
+      const q = new URLSearchParams(params || {}).toString();
+      return API.get(`/emails/sends${q ? '?' + q : ''}`);
+    },
+    replies: (params) => {
+      const q = new URLSearchParams(params || {}).toString();
+      return API.get(`/emails/replies${q ? '?' + q : ''}`);
+    },
+    syncReplies: (accountId) => API.post('/emails/replies/sync', { accountId }),
+  },
 };

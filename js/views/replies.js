@@ -1,134 +1,164 @@
-function renderReplies() {
-  const replies = Store.getReplies();
-  const unreadCount = Store.getUnreadRepliesCount();
+let _replies = [];
+
+async function renderReplies() {
+  const gen = getRenderGeneration();
+  const view = UI.el('#view');
+  if (!view) return;
+  view.innerHTML = '<div class="loading">Loading replies...</div>';
+
+  try {
+    _replies = await API.emails.replies();
+  } catch (e) {
+    _replies = [];
+  }
+
+  if (gen !== getRenderGeneration()) return;
+
+  const positive = _replies.filter(r => r.sentiment === 'positive').length;
+  const neutral = _replies.filter(r => r.sentiment === 'neutral').length;
+  const negative = _replies.filter(r => r.sentiment === 'negative').length;
+
+  let accounts = [];
+  try {
+    accounts = await API.accounts.list();
+  } catch (e) {}
 
   const html = `
     <div class="page-head">
       <div>
         <h1 class="page-title">Replies</h1>
-        <p class="page-sub">${replies.length} replies received · ${unreadCount} unread</p>
+        <p class="page-sub">${_replies.length} replies received</p>
       </div>
       <div class="page-actions">
-        <button class="btn btn-secondary" data-action="mark-all-read">${icon('check')} Mark All Read</button>
+        ${accounts.length ? `<button class="btn btn-secondary" data-action="sync-replies">${icon('refreshCw')} Sync Replies</button>` : ''}
+        ${!accounts.length ? `<p class="muted small" style="color:var(--accent)">Connect Gmail in Settings to receive replies</p>` : ''}
       </div>
     </div>
 
     <div class="metrics" style="grid-template-columns:repeat(4,1fr)">
-      ${metricCard('inbox', 'i-blue', replies.length, 'Total Replies')}
-      ${metricCard('smilePlus', 'i-green', replies.filter(r => r.sentiment === 'positive').length, 'Positive')}
-      ${metricCard('meh', 'i-amber', replies.filter(r => r.sentiment === 'neutral').length, 'Neutral')}
-      ${metricCard('frown', 'i-red', replies.filter(r => r.sentiment === 'negative').length, 'Negative')}
+      ${metricCard('inbox', 'i-blue', _replies.length, 'Total Replies')}
+      ${metricCard('smilePlus', 'i-green', positive, 'Positive')}
+      ${metricCard('meh', 'i-amber', neutral, 'Neutral')}
+      ${metricCard('frown', 'i-red', negative, 'Negative')}
     </div>
 
     <div class="card mt24">
       <div class="toolbar">
         <div class="chips" id="reply-filters">
-          <button class="chip on" data-rfilter="all">All (${replies.length})</button>
-          <button class="chip" data-rfilter="unread">Unread (${unreadCount})</button>
+          <button class="chip on" data-rfilter="all">All (${_replies.length})</button>
           <button class="chip" data-rfilter="positive">Positive</button>
           <button class="chip" data-rfilter="neutral">Neutral</button>
           <button class="chip" data-rfilter="negative">Negative</button>
         </div>
       </div>
       <div id="replies-list">
-        ${repliesList(replies)}
+        ${repliesList(_replies)}
       </div>
     </div>`;
 
+  if (gen !== getRenderGeneration()) return;
   UI.renderView(html);
-  bindReplyEvents(replies);
+  bindReplyEvents();
 }
 
 function repliesList(replies) {
   if (!replies.length) {
-    return '<div style="text-align:center;padding:40px;color:var(--text-3)">No replies match your filters.</div>';
+    return '<div style="text-align:center;padding:40px;color:var(--text-3)">No replies yet. Connect Gmail and sync to fetch replies.</div>';
   }
 
   return replies.map(r => `
-    <div class="reply-item ${!r.read ? 'unread' : ''}" data-reply="${r.id}">
+    <div class="reply-item" data-reply="${r.id}">
       <div class="reply-head">
         <div class="row" style="gap:12px">
-          ${avatar(r.leadName)}
+          ${avatar(r.fromEmail || 'Unknown')}
           <div>
-            <div class="cell-main">${escapeHtml(r.leadName)}</div>
-            <div class="cell-sub">${escapeHtml(r.company)}</div>
+            <div class="cell-main">${escapeHtml(r.fromEmail || 'Unknown')}</div>
+            <div class="cell-sub">${escapeHtml(r.subject || '')}</div>
           </div>
         </div>
         <div class="row" style="gap:8px">
-          <span class="badge ${r.sentiment === 'positive' ? 'st-res' : r.sentiment === 'neutral' ? 'st-new' : 'st-dnc'}">${r.sentiment}</span>
-          <span class="muted small">${UI.formatDate(r.receivedAt)}</span>
+          <span class="badge ${r.sentiment === 'positive' ? 'st-res' : r.sentiment === 'neutral' ? 'st-new' : 'st-dnc'}">${r.sentiment || 'neutral'}</span>
+          <span class="muted small">${UI.formatDate(r.receivedAt || r.createdAt)}</span>
         </div>
       </div>
       <div class="reply-body">
-        <div class="reply-subject">${icon('mail', 'ic-16')} ${escapeHtml(r.subject)}</div>
-        <p class="reply-text">${escapeHtml(r.body)}</p>
+        <div class="reply-subject">${icon('mail', 'ic-16')} ${escapeHtml(r.subject || 'No subject')}</div>
+        <p class="reply-text">${escapeHtml(r.snippet || r.body || '')}</p>
       </div>
       <div class="reply-actions">
         <button class="btn btn-sm btn-primary" data-reply-action="reply" data-rid="${r.id}">${icon('reply')} Reply</button>
         <button class="btn btn-sm btn-secondary" data-reply-action="forward" data-rid="${r.id}">${icon('forward')} Forward</button>
-        <button class="btn btn-sm btn-ghost" data-reply-action="view-lead" data-rid="${r.id}" data-lead-id="${r.leadId}">${icon('user')} View Lead</button>
+        ${r.leadId ? `<button class="btn btn-sm btn-ghost" data-reply-action="view-lead" data-lead-id="${r.leadId}">${icon('user')} View Lead</button>` : ''}
       </div>
     </div>
   `).join('');
 }
 
-function bindReplyEvents(replies) {
+function bindReplyEvents() {
   UI.delegate('#view', '[data-rfilter]', 'click', (e, el) => {
     UI.$$('[data-rfilter]', UI.el('#reply-filters')).forEach(c => c.classList.remove('on'));
     el.classList.add('on');
     const f = el.dataset.rfilter;
-    let filtered;
-    if (f === 'all') filtered = replies;
-    else if (f === 'unread') filtered = replies.filter(r => !r.read);
-    else filtered = replies.filter(r => r.sentiment === f);
+    const filtered = f === 'all' ? _replies : _replies.filter(r => r.sentiment === f);
     UI.html('#replies-list', repliesList(filtered));
   });
 
-  UI.delegate('#view', '[data-reply]', 'click', (e, el) => {
-    if (e.target.closest('[data-reply-action]')) return;
-    const reply = replies.find(r => r.id === el.dataset.reply);
-    if (reply) {
-      Store.markReplyRead(reply.id);
-      el.classList.remove('unread');
-    }
-  });
-
   UI.delegate('#view', '[data-reply-action="reply"]', 'click', (e, el) => {
-    const reply = replies.find(r => r.id === el.dataset.rid);
+    e.stopPropagation();
+    const reply = _replies.find(r => r.id === el.dataset.rid);
     if (reply) showReplyComposer(reply);
   });
 
   UI.delegate('#view', '[data-reply-action="forward"]', 'click', (e, el) => {
-    const reply = replies.find(r => r.id === el.dataset.rid);
+    e.stopPropagation();
+    const reply = _replies.find(r => r.id === el.dataset.rid);
     if (reply) showForwardComposer(reply);
   });
 
   UI.delegate('#view', '[data-reply-action="view-lead"]', 'click', (e, el) => {
+    e.stopPropagation();
     Store.navigate('leads', { selectedLeadId: el.dataset.leadId });
   });
 
-  UI.delegate('#view', '[data-action="mark-all-read"]', 'click', () => {
-    replies.forEach(r => Store.markReplyRead(r.id));
-    UI.toast('All replies marked as read.');
-    renderReplies();
-    UI.buildSidebar();
+  UI.delegate('#view', '[data-action="sync-replies"]', 'click', async () => {
+    try {
+      const accounts = await API.accounts.list();
+      if (!accounts.length) return UI.toast('No connected accounts');
+      UI.toast('Syncing replies...');
+      const result = await API.emails.syncReplies(accounts[0].id);
+      UI.toast(`Synced ${result.synced} new replies from ${result.total} messages.`);
+      renderReplies();
+    } catch (err) {
+      UI.toast('Sync failed: ' + err.message);
+    }
   });
 }
 
-function showReplyComposer(reply) {
+async function showReplyComposer(reply) {
+  let accounts = [];
+  try {
+    accounts = await API.accounts.list();
+  } catch (e) {}
+
   const body = `
     <div class="form-grid">
       <div class="form-group">
         <label>To</label>
-        <input type="email" value="${reply.leadEmail}" readonly style="background:var(--surface-2)">
+        <input type="email" value="${escapeHtml(reply.fromEmail || '')}" readonly style="background:var(--surface-2)">
+      </div>
+      <div class="form-group">
+        <label>From Account</label>
+        <select class="form-input" id="reply-account">
+          ${accounts.map(a => `<option value="${a.id}">${a.email}</option>`).join('')}
+        </select>
       </div>
       <div class="form-group">
         <label>Subject</label>
-        <input type="text" value="${reply.subject}" readonly style="background:var(--surface-2)">
+        <input type="text" value="Re: ${escapeHtml(reply.subject || '')}" id="reply-subject" readonly style="background:var(--surface-2)">
       </div>
       <div class="form-group">
         <label>Original Message</label>
-        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;color:var(--text-2);max-height:120px;overflow-y:auto">${escapeHtml(reply.body)}</div>
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;color:var(--text-2);max-height:120px;overflow-y:auto">${escapeHtml(reply.body || reply.snippet || '')}</div>
       </div>
       <div class="form-group">
         <label>Your Reply</label>
@@ -140,20 +170,38 @@ function showReplyComposer(reply) {
     <button class="btn btn-secondary" data-close-modal>Cancel</button>
     <button class="btn btn-primary" id="send-reply-btn">${icon('send')} Send Reply</button>`;
 
-  UI.modal(`Reply to ${reply.leadName}`, body, { wide: true, footer });
+  UI.modal(`Reply to ${reply.fromEmail || 'Unknown'}`, body, { wide: true, footer });
 
-  UI.on('#send-reply-btn', 'click', () => {
-    const body = document.getElementById('reply-body').value.trim();
-    if (!body) return UI.toast('Please write a reply.', 'error');
-    Store.markReplyRead(reply.id);
-    UI.closeModal();
-    UI.toast(`Reply sent to ${reply.leadName}.`);
-    renderReplies();
-    UI.buildSidebar();
+  UI.on('#send-reply-btn', 'click', async () => {
+    const replyBody = document.getElementById('reply-body').value.trim();
+    const accountId = document.getElementById('reply-account')?.value;
+    if (!replyBody) return UI.toast('Please write a reply.', 'error');
+    if (!accountId) return UI.toast('No sender account selected', 'error');
+
+    try {
+      await API.emails.send({
+        accountId,
+        to: reply.fromEmail,
+        subject: `Re: ${reply.subject || ''}`,
+        html: replyBody,
+        leadId: reply.leadId,
+        inReplyTo: reply.messageId
+      });
+      UI.closeModal();
+      UI.toast('Reply sent successfully.');
+      renderReplies();
+    } catch (err) {
+      UI.toast('Failed to send: ' + err.message);
+    }
   });
 }
 
-function showForwardComposer(reply) {
+async function showForwardComposer(reply) {
+  let accounts = [];
+  try {
+    accounts = await API.accounts.list();
+  } catch (e) {}
+
   const body = `
     <div class="form-grid">
       <div class="form-group">
@@ -161,12 +209,18 @@ function showForwardComposer(reply) {
         <input type="email" id="forward-to" placeholder="Enter email address">
       </div>
       <div class="form-group">
+        <label>From Account</label>
+        <select class="form-input" id="forward-account">
+          ${accounts.map(a => `<option value="${a.id}">${a.email}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
         <label>Subject</label>
-        <input type="text" value="Fwd: ${reply.subject}" id="forward-subject">
+        <input type="text" value="Fwd: ${escapeHtml(reply.subject || '')}" id="forward-subject">
       </div>
       <div class="form-group">
         <label>Original Message</label>
-        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;color:var(--text-2);max-height:120px;overflow-y:auto">${escapeHtml(reply.body)}</div>
+        <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:13px;color:var(--text-2);max-height:120px;overflow-y:auto">${escapeHtml(reply.body || reply.snippet || '')}</div>
       </div>
       <div class="form-group">
         <label>Add a Note (optional)</label>
@@ -178,15 +232,24 @@ function showForwardComposer(reply) {
     <button class="btn btn-secondary" data-close-modal>Cancel</button>
     <button class="btn btn-primary" id="send-forward-btn">${icon('forward')} Forward</button>`;
 
-  UI.modal(`Forward Reply from ${reply.leadName}`, body, { wide: true, footer });
+  UI.modal(`Forward Reply from ${reply.fromEmail || 'Unknown'}`, body, { wide: true, footer });
 
-  UI.on('#send-forward-btn', 'click', () => {
+  UI.on('#send-forward-btn', 'click', async () => {
     const to = document.getElementById('forward-to').value.trim();
+    const accountId = document.getElementById('forward-account')?.value;
+    const subject = document.getElementById('forward-subject')?.value;
+    const note = document.getElementById('forward-note')?.value?.trim();
     if (!to) return UI.toast('Please enter an email address.', 'error');
-    UI.closeModal();
-    UI.toast(`Reply forwarded to ${to}.`);
-    Store.markReplyRead(reply.id);
-    renderReplies();
-    UI.buildSidebar();
+    if (!accountId) return UI.toast('No sender account selected', 'error');
+
+    const fwdBody = `${note ? note + '\n\n---------- Forwarded message ----------\n' : ''}${reply.body || reply.snippet || ''}`;
+
+    try {
+      await API.emails.send({ accountId, to, subject, html: fwdBody });
+      UI.closeModal();
+      UI.toast(`Reply forwarded to ${to}.`);
+    } catch (err) {
+      UI.toast('Failed to forward: ' + err.message);
+    }
   });
 }

@@ -7,8 +7,6 @@ async function researchContacts(companyId) {
   const company = db.prepare(`SELECT * FROM companies WHERE id = ?`).get(companyId);
   if (!company) throw new Error('Company not found');
 
-  console.log(`[ContactIntel] Researching contacts for ${company.name}`);
-
   try {
     const result = await tavily.researchDecisionMakers(
       company.name,
@@ -34,10 +32,8 @@ async function researchContacts(companyId) {
 
     saveContacts(contacts);
 
-    console.log(`[ContactIntel] Found ${saved.length} contacts for ${company.name}`);
     return saved;
   } catch (err) {
-    console.error(`[ContactIntel] Error researching ${company.name}:`, err.message);
     return [];
   }
 }

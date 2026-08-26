@@ -98,7 +98,7 @@ const EMAIL_TEMPLATES = [
   { name: 'Breakup Email', subject: 'Should I close your file?', body: 'Hi {{firstName}},\n\nI reached out a few times but haven\'t heard back. I completely understand if now isn\'t the right time.\n\nI\'ll close this for now, but feel free to reach out if anything changes.\n\nBest,\nSamparka Team' },
 ];
 
-function genId() { return Math.random().toString(36).slice(2, 10); }
+function genId() { return Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
 
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
@@ -131,8 +131,8 @@ function generateLeads(count) {
       score: Math.floor(Math.random() * 100),
       tags: [pick(INDUSTRIES), pick(SOURCES)],
       notes: '',
-      createdAt: randomDate(new Date(2025, 8, 1), new Date(2026, 7, 1)),
-      lastActivity: randomDate(new Date(2026, 5, 1), new Date(2026, 7, 25)),
+      createdAt: randomDate(new Date(Date.now() - 365 * 86400000), new Date()),
+      lastActivity: randomDate(new Date(Date.now() - 90 * 86400000), new Date()),
     });
   }
   return leads;
@@ -155,7 +155,7 @@ function generateCampaigns(leads) {
       replied: status === 'active' ? Math.floor(Math.random() * 40) + 2 : 0,
       bounced: Math.floor(Math.random() * 20),
       leads: assigned.map(l => l.id),
-      createdAt: randomDate(new Date(2026, 4, 1), new Date(2026, 7, 1)),
+      createdAt: randomDate(new Date(Date.now() - 120 * 86400000), new Date(Date.now() - 30 * 86400000)),
     };
   });
 }
@@ -172,7 +172,7 @@ function generateActivities(leads) {
       leadName: lead.name,
       type,
       description: getActivityDesc(type, lead),
-      timestamp: randomDate(new Date(2026, 6, 1), new Date(2026, 7, 25)),
+      timestamp: randomDate(new Date(Date.now() - 60 * 86400000), new Date()),
     });
   }
   return activities.sort((a, b) => b.timestamp - a.timestamp);
@@ -217,7 +217,7 @@ function generateReplies(leads) {
         subject: `Re: Quick question about ${lead.company}`,
         body: reply.text,
         sentiment: reply.sentiment,
-        receivedAt: randomDate(new Date(2026, 6, 15), new Date(2026, 7, 25)),
+        receivedAt: randomDate(new Date(Date.now() - 30 * 86400000), new Date()),
         campaignId: null,
         read: Math.random() > 0.3,
       };

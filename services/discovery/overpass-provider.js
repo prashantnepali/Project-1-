@@ -70,9 +70,9 @@ function buildOverpassQuery(city, country, businessType) {
   let areaDecl = '';
   if (city && countryCode) {
     areaDecl = `area["ISO3166-1"="${countryCode.toUpperCase()}"]->.countryArea;
-area["name"="${city}"]["boundary"="administrative"](area.countryArea)->.searchArea;`;
+area["name"="${sanitizeOverpass(city)}"]["boundary"="administrative"](area.countryArea)->.searchArea;`;
   } else if (city) {
-    areaDecl = `area["name"="${city}"]["boundary"="administrative"]->.searchArea;`;
+    areaDecl = `area["name"="${sanitizeOverpass(city)}"]["boundary"="administrative"]->.searchArea;`;
   } else if (countryCode) {
     areaDecl = `area["ISO3166-1"="${countryCode.toUpperCase()}"]->.searchArea;`;
   }
@@ -87,12 +87,14 @@ out body center tags;
 `.trim();
 }
 
+function sanitizeOverpass(value) {
+  if (!value) return '';
+  return String(value).replace(/["\\]/g, '');
+}
+
 async function search(city, country, businessType, options = {}) {
   const query = buildOverpassQuery(city, country, businessType);
   const timeout = options.timeout || 60000;
-
-  console.log(`[Overpass] Searching: ${businessType} in ${city || '*'}, ${country}`);
-  console.log(`[Overpass] Query:\n${query}`);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
@@ -117,8 +119,6 @@ async function search(city, country, businessType, options = {}) {
 
     const data = await response.json();
     const elements = data.elements || [];
-
-    console.log(`[Overpass] Found ${elements.length} raw results`);
 
     return elements.map(el => ({
       name: el.tags?.name || null,

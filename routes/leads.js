@@ -27,7 +27,13 @@ router.get('/search', (req, res) => {
     const db = getDb();
     const maxResults = limit ? parseInt(limit) : 20;
 
-    const ftsQuery = q.split(/\s+/).filter(Boolean).map(t => `"${t.replace(/"/g, '""')}*`).join(' ');
+    const sanitized = q.replace(/['"]/g, '');
+    const ftsQuery = sanitized.split(/\s+/).filter(Boolean).map(t => {
+      const safe = t.replace(/[^a-zA-Z0-9_]/g, '');
+      return safe ? `"${safe}"*` : '';
+    }).filter(Boolean).join(' ');
+
+    if (!ftsQuery) return res.json([]);
 
     const rows = db.prepare(`
       SELECT l.*, l.rowid as rowid,

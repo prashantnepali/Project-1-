@@ -61,8 +61,6 @@ async function addToLeads(companyId) {
   addActivity(leadId, companyId, 'added_to_leads', `Added ${company.name} to leads`);
   addActivity(null, companyId, 'company_discovered', `${company.name} discovered from ${company.source || 'discovery'}`);
 
-  console.log(`[LeadService] ${company.name} added as lead (score: ${fitScore.totalScore})`);
-
   return { leadId, companyId, fitScore };
 }
 
@@ -186,17 +184,33 @@ function addManualLead(data) {
   const name = data.name || 'Unknown';
   const tags = data.tags || [data.industry, data.source].filter(Boolean);
 
+  const breakdown = {
+    industryFit: { points: 0, max: 20 },
+    repeatCustomerPotential: { points: 0, max: 20 },
+    multipleLocations: { points: 0, max: 15 },
+    digitalPresence: { points: 0, max: 10 },
+    decisionMakerFound: { points: 0, max: 15 },
+    contactAvailable: { points: (data.email || data.phone) ? 10 : 0, max: 10 },
+    noLoyaltyProgram: { points: 0, max: 10 },
+  };
+  const totalScore = data.score || 50;
+  const fitScoreId = genId();
+  db.prepare(`INSERT INTO lead_scores (id, companyId, totalScore, classification, breakdown) VALUES (?, NULL, ?, ?, ?)`).run(
+    fitScoreId, totalScore, totalScore >= 70 ? 'High Priority' : totalScore >= 40 ? 'Medium Priority' : 'Low Priority',
+    JSON.stringify(breakdown)
+  );
+
   db.prepare(`
     INSERT INTO leads (id, name, firstName, lastName, email, phone, company, title,
-      industry, location, source, status, priority, score, tags, notes, createdAt, lastActivity)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, ?, ?)
+      industry, location, source, status, priority, score, tags, notes, fitScoreId, createdAt, lastActivity)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, name, name.split(' ')[0], name.split(' ').slice(1).join(' '),
     data.email, data.phone, data.company, data.title,
     data.industry, data.location, data.source,
-    data.priority || 'medium', data.score || 50,
+    data.priority || 'medium', totalScore,
     JSON.stringify(tags), data.notes || '',
-    now(), now()
+    fitScoreId, now(), now()
   );
 
   addActivity(id, null, 'manual_add', `Manually added ${name} as lead`);
@@ -209,12 +223,14 @@ function getMetrics() {
   const total = db.prepare(`SELECT COUNT(*) as c FROM leads`).get().c;
   const newLeads = db.prepare(`SELECT COUNT(*) as c FROM leads WHERE status = 'new'`).get().c;
   const qualified = db.prepare(`SELECT COUNT(*) as c FROM leads WHERE status = 'qualified'`).get().c;
+  const inPipeline = db.prepare(`SELECT COUNT(*) as c FROM leads WHERE status NOT IN ('new', 'customer')`).get().c;
   const avgScore = db.prepare(`SELECT AVG(score) as avg FROM leads`).get().avg || 0;
 
   return {
     totalLeads: total,
     newLeads,
     qualified,
+    inPipeline,
     avgScore: Math.round(avgScore),
   };
 }

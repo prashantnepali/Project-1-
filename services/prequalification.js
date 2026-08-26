@@ -94,8 +94,6 @@ function batchPrequalify(results) {
 
   runBatch(results);
 
-  console.log(`[Prequalify] ${qualified.length} qualified, ${rejected.length} rejected out of ${results.length}`);
-
   return { qualified, rejected, total: results.length };
 }
 

@@ -29,8 +29,14 @@ router.get('/', (req, res) => {
     const results = db.prepare(query).all(...params);
 
     const enriched = results.map(r => {
-      const normalized = r.normalizedData ? JSON.parse(r.normalizedData) : null;
-      const reasons = r.prequalificationReasons ? JSON.parse(r.prequalificationReasons) : [];
+      let normalized = null;
+      let reasons = [];
+      try {
+        normalized = r.normalizedData ? JSON.parse(r.normalizedData) : null;
+      } catch { normalized = null; }
+      try {
+        reasons = r.prequalificationReasons ? JSON.parse(r.prequalificationReasons) : [];
+      } catch { reasons = []; }
       let fitScore = null;
       if (r.companyId) {
         fitScore = getFitScore(r.companyId);
@@ -68,14 +74,23 @@ router.post('/process', async (req, res) => {
       if (row) results.push(row);
     }
 
-    const normalizedResults = results.map(r => {
-      const data = JSON.parse(r.normalizedData || '{}');
-      return { ...data, id: r.id };
-    }).filter(r => r.name || r.brand || r.rawTags?.operator || r.address);
+    const normalizedResults = [];
+    for (const r of results) {
+      let data;
+      try {
+        data = JSON.parse(r.normalizedData || '{}');
+      } catch { data = {}; }
+      if (data.name || data.brand || data.rawTags?.operator || data.address) {
+        normalizedResults.push({ ...data, id: r.id });
+      }
+    }
 
     const skipped = results.length - normalizedResults.length;
     for (const r of results) {
-      const data = JSON.parse(r.normalizedData || '{}');
+      let data;
+      try {
+        data = JSON.parse(r.normalizedData || '{}');
+      } catch { data = {}; }
       if (!data.name && !data.brand && !data.rawTags?.operator && !data.address) {
         db.prepare(`UPDATE discovery_results SET status = 'rejected' WHERE id = ?`).run(r.id);
       }
@@ -117,7 +132,6 @@ router.post('/process', async (req, res) => {
       rejected: rejected.length,
     });
   } catch (err) {
-    console.error('[API] Process error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -140,7 +154,6 @@ router.post('/:id/enrich', async (req, res) => {
 
     res.json({ enrichment, contacts, fitScore });
   } catch (err) {
-    console.error('[API] Enrich error:', err);
     res.status(500).json({ error: err.message });
   }
 });

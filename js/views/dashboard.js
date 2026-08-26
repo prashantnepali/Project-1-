@@ -1,10 +1,12 @@
 async function renderDashboard() {
+  const gen = getRenderGeneration();
   let leads = [];
   let metrics = { totalLeads: 0, newLeads: 0, qualified: 0, avgScore: 0 };
   let activities = [];
 
   try {
     leads = await API.leads.list();
+    if (gen !== getRenderGeneration()) return;
     Store._state.leads = leads;
     metrics = await API.leads.metrics();
   } catch (err) {
@@ -14,6 +16,7 @@ async function renderDashboard() {
 
   try {
     activities = await API.activities.list({ limit: 8 });
+    if (gen !== getRenderGeneration()) return;
     Store._state.activities = activities;
   } catch (err) {
     activities = Store.getActivities().slice(0, 8);
@@ -168,6 +171,7 @@ async function renderDashboard() {
       </div>
     </div>`;
 
+  if (gen !== getRenderGeneration()) return;
   UI.renderView(html);
   bindDashboardEvents();
 }
@@ -215,92 +219,5 @@ function bindDashboardEvents() {
 
   UI.delegate('#view', '[data-action="export"]', 'click', () => {
     UI.toast('Export started — download will begin shortly.');
-  });
-}
-
-async function showAddLeadModal() {
-  const body = `
-    <form id="add-lead-form" class="form-grid">
-      <div class="form-row">
-        <div class="form-group">
-          <label>Full Name</label>
-          <input type="text" name="name" placeholder="e.g. Aarav Mehta" required>
-        </div>
-        <div class="form-group">
-          <label>Email</label>
-          <input type="email" name="email" placeholder="e.g. aarav@novatech.com">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Company</label>
-          <input type="text" name="company" placeholder="e.g. NovaTech Solutions">
-        </div>
-        <div class="form-group">
-          <label>Title</label>
-          <input type="text" name="title" placeholder="e.g. CEO">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Industry</label>
-          <select name="industry">
-            ${INDUSTRIES.map(i => `<option value="${i}">${i}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Source</label>
-          <select name="source">
-            ${SOURCES.map(s => `<option value="${s}">${s}</option>`).join('')}
-          </select>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Phone</label>
-          <input type="tel" name="phone" placeholder="+91 ...">
-        </div>
-        <div class="form-group">
-          <label>Priority</label>
-          <select name="priority">
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-            <option value="low">Low</option>
-          </select>
-        </div>
-      </div>
-    </form>`;
-
-  const footer = `
-    <button class="btn btn-secondary" data-close-modal>Cancel</button>
-    <button class="btn btn-primary" id="save-lead-btn">${icon('plus')} Add Lead</button>`;
-
-  UI.modal('Add New Lead', body, { footer });
-
-  UI.on('#save-lead-btn', 'click', async () => {
-    const form = document.getElementById('add-lead-form');
-    const fd = new FormData(form);
-    const name = fd.get('name').trim();
-    if (!name) return UI.toast('Please enter a name.', 'error');
-
-    try {
-      await API.leads.create({
-        name,
-        email: fd.get('email').trim(),
-        phone: fd.get('phone').trim(),
-        company: fd.get('company').trim(),
-        title: fd.get('title').trim(),
-        industry: fd.get('industry'),
-        source: fd.get('source'),
-        priority: fd.get('priority'),
-        score: 50,
-      });
-      UI.closeModal();
-      UI.toast(`${name} added to leads.`);
-      renderDashboard();
-      UI.buildSidebar();
-    } catch (err) {
-      UI.toast('Failed to add lead: ' + err.message, 'error');
-    }
   });
 }

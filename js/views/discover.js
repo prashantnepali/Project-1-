@@ -1,4 +1,7 @@
 function renderDiscover() {
+  _discoverResults = [];
+  _discoverSelected.clear();
+
   const html = `
     <div class="page-head">
       <div>
@@ -341,7 +344,7 @@ async function processResults() {
       UI.toast(`Processed ${toProcess.length} results.`);
     }
 
-    const searchId = _discoverResults[0]?.searchId;
+    const searchId = _discoverResults[0]?.searchId || _discoverResults.find(r => r.searchId)?.searchId;
     if (searchId) {
       _discoverResults = await API.prospects.list({ searchId });
     }
@@ -360,7 +363,7 @@ async function enrichProspect(resultId) {
     await API.prospects.enrich(resultId);
     UI.toast('Research completed!', 'success');
 
-    const searchId = _discoverResults[0]?.searchId;
+    const searchId = _discoverResults[0]?.searchId || _discoverResults.find(r => r.searchId)?.searchId;
     if (searchId) {
       _discoverResults = await API.prospects.list({ searchId });
     }
@@ -375,7 +378,7 @@ async function addProspectToLeads(resultId) {
     await API.prospects.addToLead(resultId);
     UI.toast('Added to leads!', 'success');
 
-    const searchId = _discoverResults[0]?.searchId;
+    const searchId = _discoverResults[0]?.searchId || _discoverResults.find(r => r.searchId)?.searchId;
     if (searchId) {
       _discoverResults = await API.prospects.list({ searchId });
     }
@@ -400,7 +403,7 @@ async function bulkAddQualified() {
     const result = await API.prospects.bulkAdd(qualified.map(r => r.id));
     UI.toast(`${result.added} leads added!`, 'success');
 
-    const searchId = _discoverResults[0]?.searchId;
+    const searchId = _discoverResults[0]?.searchId || _discoverResults.find(r => r.searchId)?.searchId;
     if (searchId) {
       _discoverResults = await API.prospects.list({ searchId });
     }

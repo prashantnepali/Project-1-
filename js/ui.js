@@ -5,6 +5,7 @@ function escapeHtml(str) {
 
 const UI = {
   el(id) {
+    if (id && id.startsWith('#')) id = id.slice(1);
     return document.getElementById(id);
   },
 
@@ -230,7 +231,9 @@ const UI = {
       } else if (action === 'docs') {
         UI.toast('Documentation would open here.');
       } else if (action === 'signout') {
-        Store.init();
+        Store._state.leads = [];
+        Store._state.activities = [];
+        Store._state.currentView = 'dashboard';
         UI.buildSidebar();
         Store.navigate('dashboard');
         UI.toast('Signed out successfully.');
