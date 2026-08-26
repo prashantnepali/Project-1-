@@ -1,9 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const discoveryService = require('../services/discovery/discovery-service');
-const { auth } = require('../middleware/auth');
-
-router.use(auth);
 
 router.post('/', async (req, res) => {
   try {

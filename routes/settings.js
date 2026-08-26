@@ -1,14 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/connection');
-const { auth } = require('../middleware/auth');
-
-router.use(auth);
 
 router.get('/', (req, res) => {
   try {
     const db = getDb();
-    const rows = db.prepare(`SELECT * FROM user_settings WHERE userId = ?`).all(req.user.id);
+    const rows = db.prepare(`SELECT * FROM settings`).all();
     const settings = {};
     for (const row of rows) {
       try { settings[row.key] = JSON.parse(row.value); } catch { settings[row.key] = row.value; }
@@ -22,10 +19,10 @@ router.get('/', (req, res) => {
 router.put('/', (req, res) => {
   try {
     const db = getDb();
-    const stmt = db.prepare(`INSERT OR REPLACE INTO user_settings (userId, key, value) VALUES (?, ?, ?)`);
+    const stmt = db.prepare(`INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)`);
     const updateMany = db.transaction((entries) => {
       for (const [key, value] of entries) {
-        stmt.run(req.user.id, key, typeof value === 'string' ? value : JSON.stringify(value));
+        stmt.run(key, typeof value === 'string' ? value : JSON.stringify(value));
       }
     });
     updateMany(Object.entries(req.body));

@@ -168,57 +168,6 @@ function initSchema() {
       value TEXT
     );
 
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      email TEXT NOT NULL UNIQUE,
-      password TEXT NOT NULL,
-      name TEXT NOT NULL,
-      role TEXT DEFAULT 'member',
-      teamId TEXT,
-      avatar TEXT,
-      createdAt TEXT DEFAULT (datetime('now')),
-      lastLogin TEXT,
-      FOREIGN KEY (teamId) REFERENCES teams(id) ON DELETE SET NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS teams (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      ownerId TEXT NOT NULL,
-      createdAt TEXT DEFAULT (datetime('now')),
-      FOREIGN KEY (ownerId) REFERENCES users(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS team_members (
-      teamId TEXT NOT NULL,
-      userId TEXT NOT NULL,
-      role TEXT DEFAULT 'member',
-      joinedAt TEXT DEFAULT (datetime('now')),
-      PRIMARY KEY (teamId, userId),
-      FOREIGN KEY (teamId) REFERENCES teams(id) ON DELETE CASCADE,
-      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS user_settings (
-      userId TEXT NOT NULL,
-      key TEXT NOT NULL,
-      value TEXT,
-      PRIMARY KEY (userId, key),
-      FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-    );
-
-    CREATE VIRTUAL TABLE IF NOT EXISTS leads_fts USING fts5(
-      name, company, email, title, industry, location, tags,
-      content='leads',
-      content_rowid='rowid'
-    );
-
-    CREATE VIRTUAL TABLE IF NOT EXISTS companies_fts USING fts5(
-      name, industry, city, country, description, category,
-      content='companies',
-      content_rowid='rowid'
-    );
-
     CREATE INDEX IF NOT EXISTS idx_contacts_company ON contacts(companyId);
     CREATE INDEX IF NOT EXISTS idx_discovery_results_search ON discovery_results(searchId);
     CREATE INDEX IF NOT EXISTS idx_discovery_results_company ON discovery_results(companyId);
@@ -233,47 +182,6 @@ function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_evidence_enrichment ON evidence(enrichmentId);
     CREATE INDEX IF NOT EXISTS idx_companies_normalizedName ON companies(normalizedName);
     CREATE INDEX IF NOT EXISTS idx_companies_domain ON companies(domain);
-    CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-    CREATE INDEX IF NOT EXISTS idx_users_team ON users(teamId);
-    CREATE INDEX IF NOT EXISTS idx_team_members_team ON team_members(teamId);
-    CREATE INDEX IF NOT EXISTS idx_team_members_user ON team_members(userId);
-    CREATE INDEX IF NOT EXISTS idx_leads_company ON leads(companyId);
-  `);
-
-  db.exec(`
-    CREATE TRIGGER IF NOT EXISTS leads_ai AFTER INSERT ON leads BEGIN
-      INSERT INTO leads_fts(rowid, name, company, email, title, industry, location, tags)
-      VALUES (new.rowid, new.name, new.company, new.email, new.title, new.industry, new.location, new.tags);
-    END;
-
-    CREATE TRIGGER IF NOT EXISTS leads_ad AFTER DELETE ON leads BEGIN
-      INSERT INTO leads_fts(leads_fts, rowid, name, company, email, title, industry, location, tags)
-      VALUES ('delete', old.rowid, old.name, old.company, old.email, old.title, old.industry, old.location, old.tags);
-    END;
-
-    CREATE TRIGGER IF NOT EXISTS leads_au AFTER UPDATE ON leads BEGIN
-      INSERT INTO leads_fts(leads_fts, rowid, name, company, email, title, industry, location, tags)
-      VALUES ('delete', old.rowid, old.name, old.company, old.email, old.title, old.industry, old.location, old.tags);
-      INSERT INTO leads_fts(rowid, name, company, email, title, industry, location, tags)
-      VALUES (new.rowid, new.name, new.company, new.email, new.title, new.industry, new.location, new.tags);
-    END;
-
-    CREATE TRIGGER IF NOT EXISTS companies_ai AFTER INSERT ON companies BEGIN
-      INSERT INTO companies_fts(rowid, name, industry, city, country, description, category)
-      VALUES (new.rowid, new.name, new.industry, new.city, new.country, new.description, new.category);
-    END;
-
-    CREATE TRIGGER IF NOT EXISTS companies_ad AFTER DELETE ON companies BEGIN
-      INSERT INTO companies_fts(companies_fts, rowid, name, industry, city, country, description, category)
-      VALUES ('delete', old.rowid, old.name, old.industry, old.city, old.country, old.description, old.category);
-    END;
-
-    CREATE TRIGGER IF NOT EXISTS companies_au AFTER UPDATE ON companies BEGIN
-      INSERT INTO companies_fts(companies_fts, rowid, name, industry, city, country, description, category)
-      VALUES ('delete', old.rowid, old.name, old.industry, old.city, old.country, old.description, old.category);
-      INSERT INTO companies_fts(rowid, name, industry, city, country, description, category)
-      VALUES (new.rowid, new.name, new.industry, new.city, new.country, new.description, new.category);
-    END;
   `);
 
   console.log('[DB] Schema initialized');

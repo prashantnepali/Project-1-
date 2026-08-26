@@ -8,9 +8,6 @@ const { enrichCompany, getEnrichment } = require('../services/enrichment/enrichm
 const { researchContacts, getContactsByCompany } = require('../services/contact-intelligence');
 const { calculateFitScore, getFitScore } = require('../services/fit-scoring');
 const { addToLeads, addActivity } = require('../services/lead-service');
-const { auth } = require('../middleware/auth');
-
-router.use(auth);
 
 router.get('/', (req, res) => {
   try {
@@ -158,7 +155,7 @@ router.post('/:id/add-to-lead', async (req, res) => {
       return res.status(400).json({ error: 'No company associated. Process and enrich first.' });
     }
 
-    const leadResult = await addToLeads(result.companyId, req.user.id);
+        const leadResult = await addToLeads(result.companyId);
     res.json(leadResult);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -183,7 +180,7 @@ router.post('/bulk-add', async (req, res) => {
           errors.push({ id, error: 'No company associated' });
           continue;
         }
-        const leadResult = await addToLeads(result.companyId, req.user.id);
+    const leadResult = await addToLeads(result.companyId);
         added.push(leadResult);
       } catch (err) {
         errors.push({ id, error: err.message });
