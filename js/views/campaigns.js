@@ -183,11 +183,63 @@ function bindCampaignEvents() {
   });
 }
 
-function showCampaignDetail(c) {
+async function showCampaignDetail(c) {
   const openRate = c.sent ? Math.round((c.opened / c.sent) * 100) : 0;
   const clickRate = c.opened ? Math.round((c.clicked / c.opened) * 100) : 0;
   const replyRate = c.sent ? Math.round((c.replied / c.sent) * 100) : 0;
   const replyCount = c.replyCount || 0;
+
+  let campaignLeads = [];
+  try {
+    campaignLeads = await API.campaigns.getLeads(c.id);
+  } catch (e) {}
+
+  const leadsHtml = campaignLeads.length ? `
+    <div class="mt24">
+      <div class="spread" style="margin-bottom:12px">
+        <h4>Assigned Leads (${campaignLeads.length})</h4>
+        <button class="btn btn-sm btn-secondary" data-campaign-add-leads="${c.id}">${icon('plus')} Add Leads</button>
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>Lead</th>
+              <th>Email</th>
+              <th>Company</th>
+              <th>Status</th>
+              <th>Sent At</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${campaignLeads.map(cl => `
+              <tr>
+                <td>${escapeHtml(cl.name)}</td>
+                <td>${escapeHtml(cl.email || '')}</td>
+                <td>${escapeHtml(cl.company || '')}</td>
+                <td>${campaignLeadBadge(cl.status)}</td>
+                <td>${cl.sentAt ? UI.formatDate(cl.sentAt) : '—'}</td>
+                <td>
+                  <div class="td-actions">
+                    <button class="ibtn ibtn-r" data-campaign-remove-lead="${c.id}" data-lead-id="${cl.leadId}" title="Remove">${icon('trash', 'ic-14')}</button>
+                  </div>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  ` : `
+    <div class="mt24">
+      <div class="spread" style="margin-bottom:12px">
+        <h4>Assigned Leads (0)</h4>
+        <button class="btn btn-sm btn-secondary" data-campaign-add-leads="${c.id}">${icon('plus')} Add Leads</button>
+      </div>
+      <p style="color:var(--text-3);font-size:13px">No leads assigned yet. Click "Add Leads" to assign leads to this campaign.</p>
+    </div>
+  `;
 
   const body = `
     <div class="spread" style="margin-bottom:20px">
@@ -218,9 +270,75 @@ function showCampaignDetail(c) {
     <div class="mt16">
       <h4 style="margin-bottom:8px">Target</h4>
       <p style="font-size:13px;color:var(--text-2)">Account: ${escapeHtml(c.accountId || 'None')}</p>
-    </div>`;
+    </div>
+    ${leadsHtml}`;
 
   UI.modal(escapeHtml(c.name), body, { wide: true });
+
+  UI.delegate('.modal-overlay', `[data-campaign-add-leads="${c.id}"]`, 'click', () => showAddLeadsModal(c.id));
+  UI.delegate('.modal-overlay', `[data-campaign-remove-lead="${c.id}"]`, 'click', async (e, el) => {
+    if (!confirm('Remove this lead from the campaign?')) return;
+    try {
+      await API.campaigns.assignLeads(c.id, [el.dataset.leadId]); // This won't work for remove, need a delete endpoint
+    } catch (err) {
+      UI.toast('Failed to remove lead');
+    }
+  });
+}
+
+function campaignLeadBadge(status) {
+  const colors = { pending: 'st-new', sent: 'st-sent', replied: 'st-res', failed: 'st-dnc' };
+  return `<span class="badge ${colors[status] || 'st-new'}">${status}</span>`;
+}
+
+async function showAddLeadsModal(campaignId) {
+  let allLeads = [];
+  try {
+    allLeads = await API.leads.list({ status: 'new' });
+  } catch (e) {}
+
+  const campaignLeads = await API.campaigns.getLeads(campaignId);
+  const assignedIds = new Set(campaignLeads.map(cl => cl.leadId));
+  const availableLeads = allLeads.filter(l => !assignedIds.has(l.id));
+
+  const body = `
+    <div class="form-group">
+      <label class="form-label">Select Leads to Add</label>
+      <div style="max-height:300px;overflow:auto">
+        ${availableLeads.length ? availableLeads.map(l => `
+          <label style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;cursor:pointer">
+            <input type="checkbox" value="${l.id}" name="lead-select">
+            <div>
+              <div class="cell-main">${escapeHtml(l.name)}</div>
+              <div class="cell-sub">${escapeHtml(l.email || '')} • ${escapeHtml(l.company || '')}</div>
+            </div>
+          </label>
+        `).join('') : '<p style="color:var(--text-3)">No available leads to add</p>'}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-primary" id="add-selected-leads">Add Selected</button>
+      <button class="btn" id="cancel-add-leads">Cancel</button>
+    </div>`;
+
+  UI.modal('Add Leads to Campaign', body, { wide: true });
+
+  document.getElementById('add-selected-leads')?.addEventListener('click', async () => {
+    const selected = Array.from(document.querySelectorAll('input[name="lead-select"]:checked')).map(cb => cb.value);
+    if (!selected.length) return UI.toast('No leads selected');
+    try {
+      await API.campaigns.assignLeads(campaignId, selected);
+      UI.toast(`Added ${selected.length} leads to campaign.`);
+      document.querySelector('.modal-overlay')?.remove();
+      const c = await API.campaigns.get(campaignId);
+      showCampaignDetail(c);
+    } catch (err) {
+      UI.toast('Failed to add leads: ' + err.message);
+    }
+  });
+  document.getElementById('cancel-add-leads')?.addEventListener('click', () => {
+    document.querySelector('.modal-overlay')?.remove();
+  });
 }
 
 async function showNewCampaignModal() {

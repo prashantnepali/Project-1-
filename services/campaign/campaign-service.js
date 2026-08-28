@@ -73,6 +73,10 @@ function assignLeads(campaignId, leadIds) {
   return tx(leadIds);
 }
 
+function removeLead(campaignId, leadId) {
+  return getDb().prepare('DELETE FROM campaign_leads WHERE campaignId = ? AND leadId = ?').run(campaignId, leadId);
+}
+
 function getCampaignLeads(campaignId) {
   return getDb().prepare(`
     SELECT cl.*, l.name, l.email, l.company, l.firstName, l.lastName

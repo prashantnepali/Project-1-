@@ -5,8 +5,11 @@ const { genId } = require('../helpers');
 const SCOPES = [
   'https://www.googleapis.com/auth/gmail.send',
   'https://www.googleapis.com/auth/gmail.readonly',
-  'https://www.googleapis.com/auth/gmail.modify'
+  'https://www.googleapis.com/auth/gmail.modify',
+  'https://www.googleapis.com/auth/gmail.labels'
 ];
+
+const SAMPARKA_LABEL = 'samparka-sent';
 
 function getOAuth2Client() {
   return new google.auth.OAuth2(
@@ -14,6 +17,25 @@ function getOAuth2Client() {
     process.env.GOOGLE_CLIENT_SECRET,
     process.env.GMAIL_REDIRECT_URL || 'http://localhost:3001/auth/google/callback'
   );
+}
+
+async function getOrCreateLabel(account) {
+  const auth = getAuthForAccount(account);
+  const gmail = google.gmail({ version: 'v1', auth });
+
+  const labels = await gmail.users.labels.list({ userId: 'me' });
+  const existing = labels.data.labels?.find(l => l.name === SAMPARKA_LABEL);
+  if (existing) return existing.id;
+
+  const created = await gmail.users.labels.create({
+    userId: 'me',
+    requestBody: {
+      name: SAMPARKA_LABEL,
+      labelListVisibility: 'labelShow',
+      messageListVisibility: 'show'
+    }
+  });
+  return created.data.id;
 }
 
 function getAuthUrl() {
@@ -106,9 +128,11 @@ async function sendEmail(account, { to, subject, text, html, inReplyTo, referenc
     .replace(/\//g, '_')
     .replace(/=+$/, '');
 
+  const labelId = await getOrCreateLabel(account);
+
   const res = await gmail.users.messages.send({
     userId: 'me',
-    requestBody: { raw, threadId: undefined }
+    requestBody: { raw, labelIds: [labelId] }
   });
 
   return { messageId: res.data.id, threadId: res.data.threadId };

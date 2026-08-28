@@ -82,6 +82,15 @@ router.get('/:id/leads', (req, res) => {
   }
 });
 
+router.delete('/:id/leads/:leadId', (req, res) => {
+  try {
+    campaignService.removeLead(req.params.id, req.params.leadId);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 router.post('/:id/send', async (req, res) => {
   try {
     const result = await campaignService.sendCampaign(req.params.id);

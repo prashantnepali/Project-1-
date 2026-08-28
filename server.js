@@ -9,6 +9,10 @@ const { closeDb } = require('./db/connection');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+  console.warn('[WARN] GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set — Gmail features will fail');
+}
+
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
   : ['http://localhost:3001', 'http://localhost:3000'];
@@ -43,7 +47,7 @@ app.use('/api/activities', require('./routes/activities'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/campaigns', require('./routes/campaigns'));
 app.use('/api/emails', require('./routes/emails'));
-app.use(require('./routes/auth'));
+app.use('/api', require('./routes/auth'));
 
 app.delete('/api/data', (req, res) => {
   try {

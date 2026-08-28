@@ -1,6 +1,8 @@
 const { Router } = require('express');
 const gmailProvider = require('../services/email/gmail-provider');
 const emailService = require('../services/email/email-service');
+const { genId } = require('../services/helpers');
+const { getDb } = require('../db/connection');
 
 const router = Router();
 
@@ -46,7 +48,7 @@ router.get('/auth/google/callback', async (req, res) => {
   }
 });
 
-router.get('/api/accounts', (req, res) => {
+router.get('/accounts', (req, res) => {
   try {
     const accounts = emailService.getAccounts();
     res.json(accounts);
@@ -55,10 +57,41 @@ router.get('/api/accounts', (req, res) => {
   }
 });
 
-router.delete('/api/accounts/:id', (req, res) => {
+router.delete('/accounts/:id', (req, res) => {
   try {
     emailService.deleteAccount(req.params.id);
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/accounts/smtp', (req, res) => {
+  try {
+    const { email, displayName, smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass } = req.body;
+    if (!email || !smtpHost || !smtpPort || !smtpUser || !smtpPass) {
+      return res.status(400).json({ error: 'email, smtpHost, smtpPort, smtpUser, smtpPass are required' });
+    }
+
+    const db = getDb();
+    const existing = db.prepare('SELECT id FROM email_accounts WHERE email = ? AND provider = ?').get(email, 'smtp');
+
+    const id = genId();
+    if (existing) {
+      db.prepare(`
+        UPDATE email_accounts
+        SET displayName = ?, smtpHost = ?, smtpPort = ?, smtpSecure = ?, smtpUser = ?, smtpPass = ?, updatedAt = datetime('now')
+        WHERE id = ?
+      `).run(displayName || email.split('@')[0], smtpHost, smtpPort, smtpSecure ? 'true' : 'false', smtpUser, smtpPass, existing.id);
+      return res.json({ id: existing.id, email, displayName, status: 'updated' });
+    }
+
+    db.prepare(`
+      INSERT INTO email_accounts (id, provider, email, displayName, smtpHost, smtpPort, smtpSecure, smtpUser, smtpPass, status)
+      VALUES (?, 'smtp', ?, ?, ?, ?, ?, ?, ?, 'active')
+    `).run(id, email, displayName || email.split('@')[0], smtpHost, smtpPort, smtpSecure ? 'true' : 'false', smtpUser, smtpPass);
+
+    res.json({ id, email, displayName, status: 'connected' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

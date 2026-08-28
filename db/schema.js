@@ -173,13 +173,18 @@ function initSchema() {
       provider TEXT NOT NULL DEFAULT 'google',
       email TEXT NOT NULL,
       displayName TEXT,
-      accessToken TEXT NOT NULL,
-      refreshToken TEXT NOT NULL,
-      tokenExpiry TEXT NOT NULL,
+      accessToken TEXT,
+      refreshToken TEXT,
+      tokenExpiry TEXT,
       scope TEXT,
       status TEXT DEFAULT 'active',
       connectedAt TEXT DEFAULT (datetime('now')),
-      updatedAt TEXT DEFAULT (datetime('now'))
+      updatedAt TEXT DEFAULT (datetime('now')),
+      smtpHost TEXT,
+      smtpPort INTEGER,
+      smtpSecure TEXT,
+      smtpUser TEXT,
+      smtpPass TEXT
     );
 
     CREATE TABLE IF NOT EXISTS campaigns (
@@ -302,6 +307,21 @@ function initSchema() {
       INSERT INTO leads_fts(rowid, name, company) VALUES (new.rowid, new.name, new.company);
     END;
   `);
+
+  const migrations = [
+    'ALTER TABLE email_replies ADD COLUMN campaignId TEXT',
+    'ALTER TABLE email_replies ADD COLUMN processedAt TEXT',
+    'ALTER TABLE email_accounts ADD COLUMN displayName TEXT',
+    'ALTER TABLE email_accounts ADD COLUMN status TEXT DEFAULT "active"',
+    'ALTER TABLE email_accounts ADD COLUMN smtpHost TEXT',
+    'ALTER TABLE email_accounts ADD COLUMN smtpPort INTEGER',
+    'ALTER TABLE email_accounts ADD COLUMN smtpSecure TEXT',
+    'ALTER TABLE email_accounts ADD COLUMN smtpUser TEXT',
+    'ALTER TABLE email_accounts ADD COLUMN smtpPass TEXT',
+  ];
+  for (const sql of migrations) {
+    try { db.exec(sql); } catch (_) {}
+  }
 }
 
 module.exports = { initSchema };

@@ -41,10 +41,11 @@ async function renderDashboard() {
         <h1 class="page-title">Dashboard</h1>
         <p class="page-sub">Welcome back, Prashant. Here's your lead engine overview.</p>
       </div>
-      <div class="page-actions">
-        <button class="btn btn-secondary" data-action="export">${icon('download')} Export</button>
-        <button class="btn btn-primary" data-action="add-lead">${icon('plus')} Add Lead</button>
-      </div>
+<div class="page-actions">
+          <button class="btn btn-secondary" data-action="export">${icon('download')} Export</button>
+          <button class="btn btn-secondary" data-action="send-email">${icon('send')} Send Email</button>
+          <button class="btn btn-primary" data-action="add-lead">${icon('plus')} Add Lead</button>
+        </div>
     </div>
 
     <div class="metrics">
@@ -219,5 +220,126 @@ function bindDashboardEvents() {
 
   UI.delegate('#view', '[data-action="export"]', 'click', () => {
     UI.toast('Export started — download will begin shortly.');
+  });
+
+  UI.delegate('#view', '[data-action="send-email"]', 'click', () => {
+    showSendEmailModal();
+  });
+}
+
+async function showSendEmailModal() {
+  const accounts = await API.accounts.list();
+  if (!accounts.length) {
+    UI.toast('No email accounts connected. Add one in Settings.', 'error');
+    return;
+  }
+
+  const activeAccounts = accounts.filter(a => a.status === 'active');
+  if (!activeAccounts.length) {
+    UI.toast('No active email accounts.', 'error');
+    return;
+  }
+
+  const accountOptions = activeAccounts.map(a => `<option value="${a.id}">${escapeHtml(a.displayName || a.email)} <${escapeHtml(a.email)}></option>`).join('');
+
+  const placeholders = ['{{firstName}}', '{{lastName}}', '{{company}}', '{{title}}'];
+
+  const html = `
+    <div class="modal-overlay" id="send-email-modal">
+      <div class="modal em-modal">
+        <div class="modal-head em-head">
+          <div class="em-head-title">
+            <div class="em-head-icon">${icon('send')}</div>
+            <div>
+              <h3>Send Email</h3>
+              <p>Compose and send an email right now</p>
+            </div>
+          </div>
+          <button class="ibtn" data-close aria-label="Close">${icon('x')}</button>
+        </div>
+        <form id="send-email-form" class="modal-body em-form">
+          <div class="form-group">
+            <label>${icon('atSign', 'ic-14')} From Account</label>
+            <div class="em-select-wrap">
+              <select name="accountId" required>${accountOptions}</select>
+              ${icon('chevronDown', 'ic-14 em-select-caret')}
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>${icon('mail', 'ic-14')} To</label>
+              <input type="email" name="to" placeholder="recipient@example.com" required />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>${icon('type', 'ic-14')} Subject</label>
+            <input type="text" name="subject" placeholder="Email subject" required />
+          </div>
+
+          <div class="form-group">
+            <label>${icon('fileText', 'ic-14')} Message <span class="em-lbl-opt">HTML supported</span></label>
+            <textarea name="html" class="em-msg" rows="7" placeholder="<p>Hello {{firstName}},</p>&#10;&#10;<p>This supports HTML and placeholders.</p>"></textarea>
+          </div>
+
+          <div class="em-chips">
+            ${placeholders.map(p => `<button type="button" class="em-chip" data-ph="${p}">${p}</button>`).join('')}
+            <span class="em-chip-hint">Click to insert</span>
+          </div>
+
+          <div class="form-group">
+            <label>${icon('alignLeft', 'ic-14')} Plain Text <span class="em-lbl-opt">optional</span></label>
+            <textarea name="text" rows="4" placeholder="Plain text version for clients that don't support HTML"></textarea>
+          </div>
+        </form>
+        <div class="modal-foot em-foot">
+          <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+          <button type="submit" form="send-email-form" class="btn btn-primary">${icon('send')} Send Email</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.insertAdjacentHTML('beforeend', html);
+  const modal = document.getElementById('send-email-modal');
+  requestAnimationFrame(() => modal.classList.add('open'));
+  modal.querySelectorAll('[data-close]').forEach(btn => btn.addEventListener('click', () => modal.remove()));
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+
+  const msgArea = modal.querySelector('textarea[name="html"]');
+  modal.querySelectorAll('.em-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      msgArea.value += chip.dataset.ph;
+      msgArea.focus();
+    });
+  });
+
+  modal.querySelector('#send-email-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const btn = modal.querySelector('button[form="send-email-form"]');
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `${icon('refreshCw', 'ic-14 spin')} Sending...`;
+
+    const data = {
+      accountId: form.accountId.value,
+      to: form.to.value,
+      subject: form.subject.value,
+      html: form.html.value || undefined,
+      text: form.text.value || undefined,
+    };
+
+    try {
+      await API.emails.send(data);
+      UI.toast('Email sent successfully!');
+      modal.remove();
+    } catch (err) {
+      UI.toast('Failed to send: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
   });
 }

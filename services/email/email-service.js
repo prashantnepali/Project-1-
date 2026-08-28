@@ -1,6 +1,7 @@
 const { getDb } = require('../../db/connection');
 const { genId } = require('../helpers');
 const gmail = require('./gmail-provider');
+const smtp = require('./smtp-provider');
 
 function getAccount(id) {
   return getDb().prepare('SELECT * FROM email_accounts WHERE id = ?').get(id);
@@ -32,7 +33,12 @@ async function sendSingle(accountId, { to, subject, text, html, leadId, campaign
 
   const id = genId();
   try {
-    const result = await gmail.sendEmail(account, { to, subject, text, html, inReplyTo, references });
+    let result;
+    if (account.provider === 'smtp') {
+      result = await smtp.sendEmail(account, { to, subject, text, html, inReplyTo, references });
+    } else {
+      result = await gmail.sendEmail(account, { to, subject, text, html, inReplyTo, references });
+    }
 
     db.prepare(`
       INSERT INTO email_sends (id, campaignId, leadId, accountId, toEmail, subject, body, messageId, threadId, status, sentAt)
@@ -98,19 +104,47 @@ async function syncReplies(accountId) {
     const fromMatch = full.from?.match(/<(.+?)>/);
     const fromEmail = fromMatch ? fromMatch[1] : full.from;
 
-    const leadMatch = db.prepare('SELECT id, campaignId FROM leads WHERE email = ?').get(fromEmail);
+    const leadMatch = db.prepare('SELECT id FROM leads WHERE email = ?').get(fromEmail);
+
+    let campaignId = null;
+
+    if (full.threadId) {
+      const sendMatch = db.prepare('SELECT campaignId FROM email_sends WHERE threadId = ?').get(full.threadId);
+      if (sendMatch?.campaignId) {
+        campaignId = sendMatch.campaignId;
+      }
+    }
 
     db.prepare(`
       INSERT INTO email_replies (id, accountId, leadId, campaignId, messageId, threadId, fromEmail, toEmail, subject, body, snippet, receivedAt, createdAt)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     `).run(
-      id, accountId, leadMatch?.id || null, leadMatch?.campaignId || null,
+      id, accountId, leadMatch?.id || null, campaignId,
       full.id, full.threadId, fromEmail, account.email,
       full.subject, full.body, full.snippet, full.date
     );
 
     if (leadMatch?.id) {
-      db.prepare(`UPDATE leads SET lastActivity = datetime('now') WHERE id = ?`).run(leadMatch.id);
+      db.prepare(`UPDATE leads SET lastActivity = datetime('now'), status = 'replied' WHERE id = ?`).run(leadMatch.id);
+
+      db.prepare(`
+        INSERT INTO activities (id, leadId, companyId, type, description, metadata, timestamp)
+        VALUES (?, ?, ?, 'reply_received', ?, ?, datetime('now'))
+      `).run(
+        genId(), leadMatch.id, null,
+        `Reply received from ${fromEmail}: ${full.subject || '(no subject)'}`,
+        JSON.stringify({ messageId: full.id, threadId: full.threadId, campaignId })
+      );
+    }
+
+    if (campaignId) {
+      db.prepare(`
+        UPDATE campaign_leads
+        SET status = 'replied', repliedAt = datetime('now')
+        WHERE campaignId = ? AND leadId = ? AND status IN ('pending', 'sent')
+      `).run(campaignId, leadMatch?.id);
+
+      db.prepare('UPDATE campaigns SET replied = replied + 1 WHERE id = ?').run(campaignId);
     }
 
     synced++;
