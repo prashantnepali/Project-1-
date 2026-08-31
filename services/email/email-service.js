@@ -69,7 +69,7 @@ function getReplies(accountId, { limit = 50, offset = 0 } = {}) {
     params.push(accountId);
   }
 
-  query += ' ORDER BY receivedAt DESC LIMIT ? OFFSET ?';
+  query += ' ORDER BY COALESCE(receivedAt, createdAt) DESC, createdAt DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
 
   return db.prepare(query).all(...params);
@@ -84,14 +84,14 @@ async function syncReplies(accountId) {
     'SELECT receivedAt FROM email_replies WHERE accountId = ? ORDER BY receivedAt DESC LIMIT 1'
   ).get(accountId);
 
-  let query = 'is:unread -label:samparka-sent';
+  let query = '-from:me -label:samparka-sent';
   if (lastReply?.receivedAt) {
     const afterDate = new Date(lastReply.receivedAt);
     const dateStr = `${afterDate.getFullYear()}/${afterDate.getMonth() + 1}/${afterDate.getDate()}`;
     query += ` after:${dateStr}`;
   }
 
-  const { messages } = await gmail.listMessages(account, query, 50);
+  const { messages } = await gmail.listMessages(account, query, 100);
 
   let synced = 0;
   for (const msg of messages) {
@@ -122,6 +122,14 @@ async function syncReplies(accountId) {
       id, accountId, leadMatch?.id || null, campaignId,
       full.id, full.threadId, fromEmail, account.email,
       full.subject, full.body, full.snippet, full.date
+    );
+
+    db.prepare(`
+      INSERT INTO notifications (id, type, replyId, accountId, leadId, fromEmail, subject, snippet, read, createdAt)
+      VALUES (?, 'reply', ?, ?, ?, ?, ?, ?, 0, datetime('now'))
+    `).run(
+      genId(), id, accountId, leadMatch?.id || null,
+      fromEmail, full.subject || null, full.snippet || null
     );
 
     if (leadMatch?.id) {
@@ -164,10 +172,31 @@ function getSends({ campaignId, leadId, accountId, limit = 50, offset = 0 } = {}
 
   let query = 'SELECT * FROM email_sends';
   if (conditions.length) query += ' WHERE ' + conditions.join(' AND ');
-  query += ' ORDER BY createdAt DESC LIMIT ? OFFSET ?';
+  query += ' ORDER BY COALESCE(sentAt, createdAt) DESC, createdAt DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
 
   return db.prepare(query).all(...params);
 }
 
-module.exports = { getAccount, getAccounts, deleteAccount, replacePlaceholders, sendSingle, getReplies, syncReplies, getSends };
+function getNotifications({ unreadOnly = false, limit = 50 } = {}) {
+  const db = getDb();
+  let query = 'SELECT * FROM notifications';
+  if (unreadOnly) query += ' WHERE read = 0';
+  query += ' ORDER BY createdAt DESC LIMIT ?';
+  return db.prepare(query).all(limit);
+}
+
+function countUnreadNotifications() {
+  return getDb().prepare('SELECT COUNT(*) c FROM notifications WHERE read = 0').get().c;
+}
+
+function markNotificationsRead(ids = []) {
+  const db = getDb();
+  if (Array.isArray(ids) && ids.length) {
+    const placeholders = ids.map(() => '?').join(',');
+    return db.prepare(`UPDATE notifications SET read = 1 WHERE id IN (${placeholders})`).run(...ids).changes;
+  }
+  return db.prepare('UPDATE notifications SET read = 1').run().changes;
+}
+
+module.exports = { getAccount, getAccounts, deleteAccount, replacePlaceholders, sendSingle, getReplies, syncReplies, getSends, getNotifications, countUnreadNotifications, markNotificationsRead };

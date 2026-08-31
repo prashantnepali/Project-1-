@@ -149,6 +149,14 @@ async function listMessages(account, query = 'label:inbox', maxResults = 50, pag
   return { messages: res.data.messages || [], nextPageToken: res.data.nextPageToken };
 }
 
+function toDbDate(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
 async function getMessage(account, messageId) {
   const auth = getAuthForAccount(account);
   const gmail = google.gmail({ version: 'v1', auth });
@@ -173,7 +181,7 @@ async function getMessage(account, messageId) {
     subject: getHeader('Subject'),
     from: getHeader('From'),
     to: getHeader('To'),
-    date: getHeader('Date'),
+    date: toDbDate(getHeader('Date')) || getHeader('Date'),
     snippet: msg.snippet,
     body,
     labels: msg.labelIds,

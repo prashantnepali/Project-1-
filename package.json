@@ -5,6 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "start:bg": "start-server.bat",
+    "stop": "stop-server.bat",
+    "restart": "restart-server.bat",
     "dev": "npx nodemon server.js"
   },
   "dependencies": {

@@ -62,6 +62,18 @@ const UI = {
     return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   },
 
+  formatTime(d) {
+    if (!d) return '—';
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return String(d);
+    const pad = n => String(n).padStart(2, '0');
+    let h = date.getHours();
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) +
+      ', ' + pad(h) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds()) + ' ' + ampm;
+  },
+
   formatNumber(n) {
     if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
     if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
@@ -130,7 +142,10 @@ const UI = {
       </div>`;
     requestAnimationFrame(() => root.querySelector('.modal-overlay').classList.add('open'));
     root.querySelectorAll('[data-close-modal]').forEach(el => {
-      el.addEventListener('click', () => UI.closeModal());
+      el.addEventListener('click', (e) => {
+        if (el.classList.contains('modal-overlay') && e.target !== el) return;
+        UI.closeModal();
+      });
     });
   },
 
@@ -215,6 +230,11 @@ const UI = {
     UI.delegate(sb, '[data-nav]', 'click', (e, el) => {
       e.preventDefault();
       Store.navigate(el.dataset.nav);
+      if (window.innerWidth <= 860) {
+        UI.el('sidebar')?.classList.remove('open');
+        UI.el('sidebar-overlay')?.classList.remove('show');
+        document.body.classList.remove('no-scroll');
+      }
     });
 
     UI.on('#sb-user-btn', 'click', () => {
@@ -258,16 +278,32 @@ const UI = {
         Samparka
       </div>
       <span class="tb-spacer"></span>
-      <button class="ibtn">${icon('search')}</button>
-      <button class="ibtn" data-nav="replies">
+      <button class="ibtn" data-nav="replies" style="position:relative">
         ${icon('inbox')}
-        ${unread > 0 ? `<span class="nav-badge show" style="position:absolute;top:-4px;right:-4px;font-size:9px;min-width:15px;height:15px">${unread}</span>` : ''}
-      </button>`;
+        ${unread > 0 ? `<span class="nav-badge show" id="tb-inbox-badge" style="position:absolute;top:-4px;right:-4px;font-size:9px;min-width:15px;height:15px">${unread}</span>` : ''}
+      </button>
+      <div class="notif-wrap" id="notif-wrap">
+        <button class="ibtn" id="notif-btn" style="position:relative">
+          ${icon('bell')}
+          <span class="nav-badge" id="notif-badge" style="position:absolute;top:-4px;right:-4px;font-size:9px;min-width:15px;height:15px"></span>
+        </button>
+        <div class="notif-panel" id="notif-panel">
+          <div class="notif-head">
+            <span>Notifications</span>
+            <button class="btn btn-sm btn-ghost" id="notif-mark-read">Mark all read</button>
+          </div>
+          <div class="notif-list" id="notif-list">
+            <div style="padding:20px;color:var(--text-3);text-align:center">Loading...</div>
+          </div>
+        </div>
+      </div>`;
 
     UI.on('#menu-toggle', 'click', () => {
       UI.el('sidebar').classList.toggle('open');
-      UI.el('sidebar-overlay').classList.toggle('show');
-      document.body.classList.toggle('no-scroll');
+      if (window.innerWidth <= 860) {
+        UI.el('sidebar-overlay')?.classList.toggle('show');
+        document.body.classList.toggle('no-scroll');
+      }
     });
 
     UI.on('#sidebar-overlay', 'click', () => {
@@ -275,6 +311,66 @@ const UI = {
       UI.el('sidebar-overlay').classList.remove('show');
       document.body.classList.remove('no-scroll');
     });
+
+    UI.on('#notif-btn', 'click', (e) => {
+      e.stopPropagation();
+      const panel = UI.el('notif-panel');
+      const wasOpen = panel.classList.contains('open');
+      panel.classList.toggle('open');
+      if (!wasOpen && typeof refreshNotifications === 'function') refreshNotifications(false);
+    });
+
+    UI.delegate(tb, '[data-notif-id]', 'click', (e, el) => {
+      e.stopPropagation();
+      if (el.dataset.notifId && typeof API !== 'undefined') {
+        API.emails.notifications.markRead([el.dataset.notifId]).catch(() => {});
+      }
+      UI.el('notif-panel').classList.remove('open');
+      Store.navigate('replies');
+    });
+
+    UI.on('#notif-mark-read', 'click', (e) => {
+      e.stopPropagation();
+      if (typeof API !== 'undefined') {
+        API.emails.notifications.markRead().then(() => {
+          UI.el('notif-panel').classList.remove('open');
+          if (typeof refreshNotifications === 'function') refreshNotifications(true);
+          UI.toast('All notifications marked as read.');
+        }).catch(() => {});
+      }
+    });
+
+    UI.on(document, 'click', (e) => {
+      const panel = UI.el('notif-panel');
+      if (panel && !e.target.closest('#notif-wrap')) panel.classList.remove('open');
+    });
+  },
+
+  updateNotifBadge(count) {
+    const b = UI.el('notif-badge');
+    if (b) {
+      b.textContent = count > 99 ? '99+' : count;
+      b.classList.toggle('show', count > 0);
+    }
+  },
+
+  renderNotifications(list) {
+    const el = UI.el('notif-list');
+    if (!el) return;
+    if (!list || !list.length) {
+      el.innerHTML = '<div class="notif-empty">No notifications yet.</div>';
+      return;
+    }
+    el.innerHTML = list.map(n => `
+      <button class="notif-item ${n.read ? 'read' : ''}" data-notif-id="${n.id}">
+        <span class="notif-dot"></span>
+        <div class="notif-meta">
+          <div class="notif-from">${escapeHtml(n.fromEmail || 'Unknown')}</div>
+          <div class="notif-subject">${escapeHtml(n.subject || '(no subject)')}</div>
+          <div class="notif-time">${UI.formatTime(n.createdAt)}</div>
+        </div>
+      </button>
+    `).join('');
   },
 
   renderView(html) {

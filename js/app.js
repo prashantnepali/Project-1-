@@ -30,6 +30,53 @@ async function navigateTo(view) {
   }
 }
 
+let _notifList = [];
+let _notifUnread = 0;
+let _syncing = false;
+
+async function refreshNotifications(silent = true) {
+  try {
+    const data = await API.emails.notifications.list({ limit: 50 });
+    _notifUnread = data.unread || 0;
+    _notifList = data.notifications || [];
+    UI.updateNotifBadge(_notifUnread);
+    UI.renderNotifications(_notifList);
+  } catch (e) {
+    if (!silent) UI.toast('Failed to load notifications.', 'error');
+  }
+}
+
+async function checkNewReplies() {
+  if (_syncing) return;
+  _syncing = true;
+  try {
+    const accounts = await API.accounts.list();
+    const gmail = accounts.find(a => a.provider === 'google');
+    if (!gmail) return;
+    const result = await API.emails.syncReplies(gmail.id);
+    if (result.synced > 0) {
+      UI.toast(`New reply received from your inbox (${result.synced} new).`);
+    }
+    await refreshNotifications();
+  } catch (e) {
+    /* ignore polling errors */
+  } finally {
+    _syncing = false;
+  }
+}
+
+function startReplyPolling(intervalMs = 60000) {
+  setInterval(() => {
+    if (!document.hidden) checkNewReplies();
+  }, intervalMs);
+}
+
+function syncSidebarForWidth() {
+  const sb = UI.el('sidebar');
+  if (!sb) return;
+  sb.classList.toggle('open', window.innerWidth >= 861);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   Store.init();
   if (Store.get('settings').darkMode) {
@@ -38,6 +85,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   UI.buildSidebar();
   UI.buildTopbar();
+  syncSidebarForWidth();
+  window.addEventListener('resize', syncSidebarForWidth);
+  refreshNotifications();
+
+  checkNewReplies();
+  startReplyPolling();
 
   Store.on('navigate', ({ view }) => {
     UI.buildSidebar();

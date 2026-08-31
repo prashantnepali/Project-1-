@@ -89,7 +89,7 @@ function initSchema() {
 
     CREATE TABLE IF NOT EXISTS lead_scores (
       id TEXT PRIMARY KEY,
-      companyId TEXT NOT NULL,
+      companyId TEXT,
       totalScore INTEGER DEFAULT 0,
       classification TEXT DEFAULT 'Low Priority',
       breakdown TEXT DEFAULT '{}',
@@ -267,6 +267,22 @@ function initSchema() {
       FOREIGN KEY (campaignId) REFERENCES campaigns(id) ON DELETE SET NULL
     );
 
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      type TEXT DEFAULT 'reply',
+      replyId TEXT,
+      accountId TEXT,
+      leadId TEXT,
+      fromEmail TEXT,
+      subject TEXT,
+      snippet TEXT,
+      read INTEGER DEFAULT 0,
+      createdAt TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (accountId) REFERENCES email_accounts(id) ON DELETE CASCADE,
+      FOREIGN KEY (replyId) REFERENCES email_replies(id) ON DELETE CASCADE,
+      FOREIGN KEY (leadId) REFERENCES leads(id) ON DELETE SET NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_contacts_company ON contacts(companyId);
     CREATE INDEX IF NOT EXISTS idx_discovery_results_search ON discovery_results(searchId);
     CREATE INDEX IF NOT EXISTS idx_discovery_results_company ON discovery_results(companyId);
@@ -282,6 +298,8 @@ function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_companies_normalizedName ON companies(normalizedName);
     CREATE INDEX IF NOT EXISTS idx_companies_domain ON companies(domain);
     CREATE INDEX IF NOT EXISTS idx_email_accounts_email ON email_accounts(email);
+    CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
+    CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(createdAt);
     CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns(status);
     CREATE INDEX IF NOT EXISTS idx_campaign_leads_campaign ON campaign_leads(campaignId);
     CREATE INDEX IF NOT EXISTS idx_campaign_leads_lead ON campaign_leads(leadId);
@@ -321,6 +339,25 @@ function initSchema() {
   ];
   for (const sql of migrations) {
     try { db.exec(sql); } catch (_) {}
+  }
+
+  const leadScoreCol = db.prepare("PRAGMA table_info(lead_scores)").all().find(c => c.name === 'companyId');
+  if (leadScoreCol && leadScoreCol.notnull === 1) {
+    db.exec(`
+      ALTER TABLE lead_scores RENAME TO lead_scores_old;
+      CREATE TABLE lead_scores (
+        id TEXT PRIMARY KEY,
+        companyId TEXT,
+        totalScore INTEGER DEFAULT 0,
+        classification TEXT DEFAULT 'Low Priority',
+        breakdown TEXT DEFAULT '{}',
+        calculatedAt TEXT DEFAULT (datetime('now')),
+        FOREIGN KEY (companyId) REFERENCES companies(id) ON DELETE CASCADE
+      );
+      INSERT INTO lead_scores (id, companyId, totalScore, classification, breakdown, calculatedAt)
+        SELECT id, companyId, totalScore, classification, breakdown, calculatedAt FROM lead_scores_old;
+      DROP TABLE lead_scores_old;
+    `);
   }
 }
 

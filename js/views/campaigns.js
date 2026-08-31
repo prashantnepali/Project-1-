@@ -341,65 +341,284 @@ async function showAddLeadsModal(campaignId) {
   });
 }
 
+const CAMPAIGN_STEPS = ['Details', 'Audience', 'Sender', 'Email'];
+const CAMPAIGN_PLACEHOLDERS = ['{{firstName}}', '{{lastName}}', '{{company}}', '{{industry}}', '{{title}}'];
+
 async function showNewCampaignModal() {
   let accounts = [];
+  let allLeads = [];
   try {
     accounts = await API.accounts.list();
   } catch (e) {}
+  try {
+    allLeads = await API.leads.list();
+  } catch (e) {}
 
   if (!accounts.length) {
-    UI.toast('Connect a Gmail account in Settings first.');
+    UI.toast('Connect an email account in Settings first.', 'error');
+    return;
+  }
+  if (!allLeads.length) {
+    UI.toast('Add leads first before creating a campaign.', 'error');
     return;
   }
 
-  const body = `
-    <div class="form-group">
-      <label class="form-label">Campaign Name</label>
-      <input class="form-input" id="nc-name" placeholder="e.g. Q1 Outreach Campaign">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Sender Account</label>
-      <select class="form-input" id="nc-account">
-        ${accounts.map(a => `<option value="${a.id}">${a.email}</option>`).join('')}
-      </select>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Subject Line</label>
-      <input class="form-input" id="nc-subject" placeholder="Use {{company}}, {{firstName}} for personalization">
-    </div>
-    <div class="form-group">
-      <label class="form-label">Email Body (HTML)</label>
-      <textarea class="form-input" id="nc-body" rows="8" placeholder="Hi {{firstName}},&#10;&#10;I noticed {{company}} in the {{industry}} space..."></textarea>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:16px">
-      <button class="btn btn-primary" id="nc-save">Save as Draft</button>
-      <button class="btn" id="nc-cancel">Cancel</button>
-    </div>`;
+  const state = {
+    step: 1,
+    leads: allLeads,
+    selected: new Set(),
+    query: '',
+    name: '',
+    subject: '',
+    body: '',
+    accountId: '',
+  };
 
-  UI.modal('New Campaign', body);
+  const placeholders = CAMPAIGN_PLACEHOLDERS;
 
-  document.getElementById('nc-save')?.addEventListener('click', async () => {
-    const name = document.getElementById('nc-name')?.value?.trim();
-    const accountId = document.getElementById('nc-account')?.value;
-    const subject = document.getElementById('nc-subject')?.value?.trim();
-    const bodyText = document.getElementById('nc-body')?.value;
+  const html = `
+    <div class="modal-overlay" id="nc-modal">
+      <div class="modal em-modal">
+        <div class="modal-head em-head">
+          <div class="em-head-title">
+            <div class="em-head-icon">${icon('send')}</div>
+            <div>
+              <h3>New Campaign</h3>
+              <p>Create an outreach campaign in 4 steps</p>
+            </div>
+          </div>
+          <button class="ibtn" data-wc-close aria-label="Close">${icon('x')}</button>
+        </div>
+        <div class="wc-steps" id="wc-steps">
+          ${CAMPAIGN_STEPS.map((s, i) => `
+            <button class="wc-step ${i === 0 ? 'on' : ''}" data-wc-stepgo="${i + 1}">
+              <span class="wc-step-num">${i + 1}</span>
+              <span class="wc-step-lbl">${s}</span>
+            </button>`).join('')}
+        </div>
+        <div class="wc-body" id="wc-body"></div>
+        <div class="modal-foot wc-foot" id="wc-foot"></div>
+      </div>
+    </div>
+  `;
 
-    if (!name || !subject) {
-      UI.toast('Name and subject are required');
+  document.body.insertAdjacentHTML('beforeend', html);
+  const modal = document.getElementById('nc-modal');
+  requestAnimationFrame(() => modal.classList.add('open'));
+
+  function close() { modal.remove(); }
+
+  modal.querySelectorAll('[data-wc-close]').forEach(btn => btn.addEventListener('click', close));
+  modal.addEventListener('click', e => { if (e.target === modal) close(); });
+  modal.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+
+  function getVal(name) {
+    const el = modal.querySelector(`[name="${name}"]`);
+    return el ? el.value.trim() : '';
+  }
+
+  function capture() {
+    if (state.step === 1) state.name = getVal('name');
+    if (state.step === 3) state.accountId = getVal('accountId');
+    if (state.step === 4) {
+      state.subject = getVal('subject');
+      state.body = modal.querySelector('textarea[name="body"]')?.value?.trim() || '';
+    }
+  }
+
+  function updateSteps() {
+    modal.querySelectorAll('.wc-step').forEach((el, i) => {
+      el.classList.toggle('on', i === state.step - 1);
+      el.classList.toggle('done', i < state.step - 1);
+    });
+  }
+
+  function renderStep() {
+    updateSteps();
+    const body = modal.querySelector('#wc-body');
+    const foot = modal.querySelector('#wc-foot');
+
+    if (state.step === 1) {
+      body.innerHTML = `
+        <div class="form-group">
+          <label>${icon('tag', 'ic-14')} Campaign Name</label>
+          <input name="name" placeholder="e.g. Q1 Outreach Campaign" value="${escapeHtml(state.name)}" />
+        </div>
+        <div class="wc-hint">
+          ${icon('info', 'ic-14')} This is the internal name shown in your campaign list. Keep it short and clear.
+        </div>`;
+      foot.innerHTML = `
+        <button class="btn btn-ghost" data-wc-close>Cancel</button>
+        <button class="btn btn-primary" data-wc-next>${icon('arrowRight')} Choose Audience</button>`;
+    }
+
+    if (state.step === 2) {
+      const q = state.query.toLowerCase();
+      const visible = state.leads.filter(l =>
+        (l.name || '').toLowerCase().includes(q) ||
+        (l.email || '').toLowerCase().includes(q) ||
+        (l.company || '').toLowerCase().includes(q)
+      );
+      const allVisibleSelected = visible.length > 0 && visible.every(l => state.selected.has(l.id));
+
+      body.innerHTML = `
+        <div class="form-group">
+          <label>${icon('users', 'ic-14')} Select Audience
+            <span class="em-lbl-opt">${state.selected.size} selected</span>
+          </label>
+          <div class="wc-search">
+            <input type="text" id="wc-aud-search" placeholder="Search by name, email, company...">
+            <label class="wc-select-all">
+              <input type="checkbox" id="wc-aud-selectall" ${allVisibleSelected ? 'checked' : ''}>
+              Select all (${visible.length})
+            </label>
+          </div>
+        </div>
+        <div class="wc-aud-list" id="wc-aud-list">
+          ${visible.length ? visible.map(l => `
+            <label class="wc-aud-item ${state.selected.has(l.id) ? 'on' : ''}">
+              <input type="checkbox" value="${l.id}" name="aud-lead" ${state.selected.has(l.id) ? 'checked' : ''}>
+              ${avatar(l.name, 'sm')}
+              <div class="wc-aud-info">
+                <div class="cell-main">${escapeHtml(l.name)}</div>
+                <div class="cell-sub">${escapeHtml(l.email || '')}${l.company ? ' • ' + escapeHtml(l.company) : ''}</div>
+              </div>
+            </label>
+          `).join('') : '<p style="color:var(--text-3);padding:16px 4px">No leads match your search.</p>'}
+        </div>`;
+      foot.innerHTML = `
+        <button class="btn btn-ghost" data-wc-back>${icon('arrowLeft')} Back</button>
+        <button class="btn btn-primary" data-wc-next>${icon('arrowRight')} Continue</button>`;
+
+      const search = body.querySelector('#wc-aud-search');
+      search.value = state.query;
+      search.addEventListener('input', () => { state.query = search.value; renderStep(); });
+
+      body.querySelector('#wc-aud-selectall')?.addEventListener('change', (e) => {
+        const check = e.currentTarget.checked;
+        visible.forEach(l => { check ? state.selected.add(l.id) : state.selected.delete(l.id); });
+        body.querySelectorAll('input[name="aud-lead"]').forEach(cb => cb.checked = check);
+        body.querySelectorAll('.wc-aud-item').forEach(it => it.classList.toggle('on', check));
+        body.querySelector('.em-lbl-opt').textContent = state.selected.size + ' selected';
+        body.querySelector('#wc-aud-selectall').checked = check;
+      });
+
+      body.addEventListener('change', (e) => {
+        if (e.target.name === 'aud-lead') {
+          const id = e.target.value;
+          e.target.checked ? state.selected.add(id) : state.selected.delete(id);
+          e.target.closest('.wc-aud-item').classList.toggle('on', e.target.checked);
+          body.querySelector('.em-lbl-opt').textContent = state.selected.size + ' selected';
+          const allVis = body.querySelectorAll('input[name="aud-lead"]');
+          const allOn = visible.length > 0 && [...allVis].every(cb => cb.checked);
+          body.querySelector('#wc-aud-selectall').checked = allOn;
+        }
+      });
+    }
+
+    if (state.step === 3) {
+      body.innerHTML = `
+        <div class="form-group">
+          <label>${icon('atSign', 'ic-14')} Sender Account</label>
+          <select name="accountId">
+            ${accounts.map(a => `<option value="${a.id}" ${state.accountId === a.id ? 'selected' : ''}>${escapeHtml(a.displayName || a.email)} <${escapeHtml(a.email)}>${a.provider === 'smtp' ? ' (SMTP)' : ' (Gmail)'}</option>`).join('')}
+          </select>
+        </div>
+        <div class="wc-hint">
+          ${icon('info', 'ic-14')} Campaign emails will be sent from this account on behalf of your leads' outreach.
+        </div>`;
+      foot.innerHTML = `
+        <button class="btn btn-ghost" data-wc-back>${icon('arrowLeft')} Back</button>
+        <button class="btn btn-primary" data-wc-next>${icon('arrowRight')} Write Email</button>`;
+    }
+
+    if (state.step === 4) {
+      body.innerHTML = `
+        <div class="form-group">
+          <label>${icon('type', 'ic-14')} Subject Line</label>
+          <input name="subject" placeholder="e.g. Quick question about {{company}}" value="${escapeHtml(state.subject)}" />
+        </div>
+        <div class="form-group">
+          <label>${icon('fileText', 'ic-14')} Email Body <span class="em-lbl-opt">HTML supported</span></label>
+          <textarea name="body" class="em-msg" rows="8" placeholder="Hi {{firstName}},&#10;&#10;I noticed {{company}} in the {{industry}} space...">${escapeHtml(state.body)}</textarea>
+        </div>
+        <div class="em-chips">
+          ${placeholders.map(p => `<button type="button" class="em-chip" data-ph="${p}">${p}</button>`).join('')}
+          <span class="em-chip-hint">Click to insert</span>
+        </div>`;
+      foot.innerHTML = `
+        <button class="btn btn-ghost" data-wc-back>${icon('arrowLeft')} Back</button>
+        <button class="btn btn-primary" data-wc-save>${icon('save')} Save Campaign</button>`;
+
+      const msgArea = body.querySelector('textarea[name="body"]');
+      body.querySelectorAll('.em-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          msgArea.value += chip.dataset.ph;
+          msgArea.focus();
+        });
+      });
+    }
+  }
+
+  modal.addEventListener('click', (e) => {
+    const next = e.target.closest('[data-wc-next]');
+    const back = e.target.closest('[data-wc-back]');
+    const save = e.target.closest('[data-wc-save]');
+
+    if (back) {
+      capture();
+      state.step = Math.max(1, state.step - 1);
+      renderStep();
       return;
     }
 
-    try {
-      await API.campaigns.create({ name, accountId, subject, body: bodyText });
-      UI.toast('Campaign created as draft.');
-      document.querySelector('.modal-overlay')?.remove();
-      renderCampaigns();
-    } catch (err) {
-      UI.toast('Failed to create campaign: ' + err.message);
+    if (next) {
+      capture();
+      if (state.step === 1 && !state.name) return UI.toast('Please enter a campaign name.', 'error');
+      if (state.step === 2 && !state.selected.size) return UI.toast('Select at least one lead for the audience.', 'error');
+      state.step = Math.min(4, state.step + 1);
+      renderStep();
+      return;
+    }
+
+    if (save) {
+      submitCampaign();
+    }
+
+    const stepgo = e.target.closest('[data-wc-stepgo]');
+    if (stepgo) {
+      const target = parseInt(stepgo.dataset.wcStepgo, 10);
+      if (target < state.step) {
+        state.step = target;
+        renderStep();
+      }
     }
   });
 
-  document.getElementById('nc-cancel')?.addEventListener('click', () => {
-    document.querySelector('.modal-overlay')?.remove();
-  });
+  async function submitCampaign() {
+    capture();
+    if (!state.name) return UI.toast('Please enter a campaign name.', 'error');
+    if (!state.accountId) return UI.toast('Please choose a sender account.', 'error');
+    if (!state.subject) return UI.toast('Please enter a subject line.', 'error');
+    if (!state.body) return UI.toast('Please write the email body.', 'error');
+
+    const saveBtn = modal.querySelector('[data-wc-save]');
+    const original = saveBtn.innerHTML;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = `${icon('refreshCw', 'ic-14 spin')} Saving...`;
+
+    try {
+      const campaign = await API.campaigns.create({ name: state.name, accountId: state.accountId, subject: state.subject, body: state.body });
+      await API.campaigns.assignLeads(campaign.id, [...state.selected]);
+      UI.toast(`Campaign "${state.name}" created with ${state.selected.size} leads.`);
+      close();
+      renderCampaigns();
+    } catch (err) {
+      UI.toast('Failed to create campaign: ' + err.message, 'error');
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = original;
+    }
+  }
+
+  renderStep();
 }

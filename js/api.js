@@ -120,5 +120,12 @@ const API = {
       return API.get(`/emails/replies${q ? '?' + q : ''}`);
     },
     syncReplies: (accountId) => API.post('/emails/replies/sync', { accountId }),
+    notifications: {
+      list: (params) => {
+        const q = new URLSearchParams(params || {}).toString();
+        return API.get(`/emails/notifications${q ? '?' + q : ''}`);
+      },
+      markRead: (ids) => API.post('/emails/notifications/read', { ids: ids || [] }),
+    },
   },
 };

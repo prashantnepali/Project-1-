@@ -54,6 +54,7 @@ app.delete('/api/data', (req, res) => {
     const { getDb } = require('./db/connection');
     const db = getDb();
     db.exec(`
+      DELETE FROM notifications;
       DELETE FROM email_replies;
       DELETE FROM email_sends;
       DELETE FROM campaign_leads;
@@ -79,7 +80,7 @@ app.delete('/api/data', (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', version: '2.4.0' });
+  res.json({ status: 'ok', version: '2.5.2' });
 });
 
 app.get('*', (req, res) => {

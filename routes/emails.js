@@ -52,4 +52,24 @@ router.post('/replies/sync', async (req, res) => {
   }
 });
 
+router.get('/notifications', (req, res) => {
+  try {
+    const unreadOnly = req.query.unreadOnly === 'true' || req.query.unreadOnly === '1';
+    const notifications = emailService.getNotifications({ unreadOnly, limit: parseInt(req.query.limit) || 50 });
+    res.json({ notifications, unread: emailService.countUnreadNotifications() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/notifications/read', (req, res) => {
+  try {
+    const { ids } = req.body || {};
+    emailService.markNotificationsRead(ids);
+    res.json({ success: true, unread: emailService.countUnreadNotifications() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

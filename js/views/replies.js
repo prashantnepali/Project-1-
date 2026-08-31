@@ -1,4 +1,5 @@
 let _replies = [];
+let _sends = [];
 
 async function renderReplies() {
   const gen = getRenderGeneration();
@@ -7,9 +8,17 @@ async function renderReplies() {
   view.innerHTML = '<div class="loading">Loading replies...</div>';
 
   try {
-    _replies = await API.emails.replies();
+    _replies = (await API.emails.replies())
+      .sort((a, b) => new Date(b.receivedAt || b.createdAt) - new Date(a.receivedAt || a.createdAt));
   } catch (e) {
     _replies = [];
+  }
+
+  try {
+    _sends = (await API.emails.sends())
+      .sort((a, b) => new Date(b.sentAt || b.createdAt) - new Date(a.sentAt || a.createdAt));
+  } catch (e) {
+    _sends = [];
   }
 
   if (gen !== getRenderGeneration()) return;
@@ -44,21 +53,34 @@ async function renderReplies() {
 
     <div class="card mt24">
       <div class="toolbar">
-        <div class="chips" id="reply-filters">
-          <button class="chip on" data-rfilter="all">All (${_replies.length})</button>
-          <button class="chip" data-rfilter="positive">Positive</button>
-          <button class="chip" data-rfilter="neutral">Neutral</button>
-          <button class="chip" data-rfilter="negative">Negative</button>
+        <div class="chips" id="reply-tabs">
+          <button class="chip on" data-rtab="received">Received (${_replies.length})</button>
+          <button class="chip" data-rtab="sent">Sent (${_sends.length})</button>
         </div>
       </div>
-      <div id="replies-list">
-        ${repliesList(_replies)}
+      <div id="reply-panel">
+        <div class="toolbar" id="reply-filters-wrap">
+          ${filterChipsHtml()}
+        </div>
+        <div id="replies-list">
+          ${repliesList(_replies)}
+        </div>
       </div>
     </div>`;
 
   if (gen !== getRenderGeneration()) return;
   UI.renderView(html);
   bindReplyEvents();
+}
+
+function filterChipsHtml() {
+  return `
+    <div class="chips" id="reply-filters">
+      <button class="chip on" data-rfilter="all">All (${_replies.length})</button>
+      <button class="chip" data-rfilter="positive">Positive</button>
+      <button class="chip" data-rfilter="neutral">Neutral</button>
+      <button class="chip" data-rfilter="negative">Negative</button>
+    </div>`;
 }
 
 function repliesList(replies) {
@@ -78,7 +100,7 @@ function repliesList(replies) {
         </div>
         <div class="row" style="gap:8px">
           <span class="badge ${r.sentiment === 'positive' ? 'st-res' : r.sentiment === 'neutral' ? 'st-new' : 'st-dnc'}">${r.sentiment || 'neutral'}</span>
-          <span class="muted small">${UI.formatDate(r.receivedAt || r.createdAt)}</span>
+          <span class="muted small">${UI.formatTime(r.receivedAt || r.createdAt)}</span>
         </div>
       </div>
       <div class="reply-body">
@@ -94,7 +116,47 @@ function repliesList(replies) {
   `).join('');
 }
 
+function sentList(sends) {
+  if (!sends.length) {
+    return '<div style="text-align:center;padding:40px;color:var(--text-3)">No sent messages yet.</div>';
+  }
+
+  return sends.map(s => `
+    <div class="reply-item" data-send="${s.id}">
+      <div class="reply-head">
+        <div class="row" style="gap:12px">
+          ${avatar(s.toEmail || 'Unknown')}
+          <div>
+            <div class="cell-main">${escapeHtml(s.toEmail || 'Unknown')}</div>
+            <div class="cell-sub">${escapeHtml(s.subject || '')}</div>
+          </div>
+        </div>
+        <div class="row" style="gap:8px">
+          <span class="badge ${s.status === 'sent' ? 'st-res' : s.status === 'failed' ? 'st-dnc' : 'st-new'}">${s.status || 'sent'}</span>
+          <span class="muted small">${UI.formatTime(s.sentAt || s.createdAt)}</span>
+        </div>
+      </div>
+      <div class="reply-body">
+        <div class="reply-subject">${icon('send', 'ic-16')} ${escapeHtml(s.subject || 'No subject')}</div>
+        <p class="reply-text">${escapeHtml(s.body || '')}</p>
+      </div>
+    </div>
+  `).join('');
+}
+
 function bindReplyEvents() {
+  UI.delegate('#view', '[data-rtab]', 'click', (e, el) => {
+    UI.$$('[data-rtab]', UI.el('#reply-tabs')).forEach(c => c.classList.remove('on'));
+    el.classList.add('on');
+    if (el.dataset.rtab === 'sent') {
+      UI.html('#reply-filters-wrap', '');
+      UI.html('#replies-list', sentList(_sends));
+    } else {
+      UI.html('#reply-filters-wrap', filterChipsHtml());
+      UI.html('#replies-list', repliesList(_replies));
+    }
+  });
+
   UI.delegate('#view', '[data-rfilter]', 'click', (e, el) => {
     UI.$$('[data-rfilter]', UI.el('#reply-filters')).forEach(c => c.classList.remove('on'));
     el.classList.add('on');
