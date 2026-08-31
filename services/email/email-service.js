@@ -42,9 +42,9 @@ function injectTracking(html, sendId) {
     trackedHtml += pixel;
   }
 
-  // Wrap links with click tracking
+  // Wrap links with click tracking (both double and single quoted hrefs)
   trackedHtml = trackedHtml.replace(
-    /<a\s+[^>]*href="(https?:\/\/[^"]+)"[^>]*>/gi,
+    /<a\s+[^>]*href=["']((https?:\/\/)[^"']+)["'][^>]*>/gi,
     (match, url) => {
       // Don't track anchor links or tracking pixel URLs
       if (url.includes('/api/tracking/') || url.startsWith('#')) return match;
@@ -76,8 +76,8 @@ async function sendSingle(accountId, { to, subject, text, html, leadId, campaign
 
     db.prepare(`
       INSERT INTO email_sends (id, campaignId, leadId, accountId, toEmail, subject, body, messageId, threadId, status, sentAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'sent', datetime('now'))
-    `).run(id, campaignId || null, leadId || null, accountId, to, subject, html || text || '', result.messageId, result.threadId);
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'sent', ?)
+    `).run(id, campaignId || null, leadId || null, accountId, to, subject, html || text || '', result.messageId, result.threadId, new Date().toISOString());
 
     if (leadId) {
       db.prepare(`UPDATE leads SET lastActivity = datetime('now') WHERE id = ?`).run(leadId);

@@ -6,6 +6,11 @@ const { getDb } = require('../db/connection');
 
 const router = Router();
 
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 router.get('/auth/google', (req, res) => {
   try {
     const url = gmailProvider.getAuthUrl();
@@ -32,7 +37,7 @@ router.get('/auth/google/callback', async (req, res) => {
       .btn:hover{background:#00eabb}</style></head>
       <body><div class="card"><div class="check">&#10003;</div>
       <h2>Gmail Connected</h2>
-      <p>${result.email} (${result.status})</p>
+      <p>${escapeHtml(result.email)} (${escapeHtml(result.status)})</p>
       <a class="btn" onclick="window.close();opener.focus();">Done</a>
       </div></body></html>
     `);
@@ -43,7 +48,7 @@ router.get('/auth/google/callback', async (req, res) => {
       <style>body{font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#0f0f1a;color:#e0e0e0}
       .card{background:#1a1a2e;border:1px solid #ff4444;border-radius:12px;padding:40px;text-align:center;max-width:400px}
       h2{color:#ff4444}p{color:#888}</style></head>
-      <body><div class="card"><h2>Connection Failed</h2><p>${err.message}</p></div></body></html>
+      <body><div class="card"><h2>Connection Failed</h2><p>${String(err.message).replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p></div></body></html>
     `);
   }
 });

@@ -73,7 +73,9 @@ router.get('/click/:sendId', (req, res) => {
   try {
     const db = getDb();
     const sendId = req.params.sendId;
-    const url = req.query.url || '/';
+    let url = req.query.url || '/';
+    // Prevent open redirect to dangerous schemes
+    if (/^\s*(javascript|data|vbscript):/i.test(url)) url = '/';
 
     const send = db.prepare('SELECT * FROM email_sends WHERE id = ?').get(sendId);
     if (!send) {
