@@ -2,6 +2,8 @@ async function renderAnalytics() {
   const gen = getRenderGeneration();
   let leads = Store.get('leads') || [];
   let metrics = { totalLeads: 0, newLeads: 0, qualified: 0, avgScore: 0 };
+  let campaigns = [];
+  let emailAnalytics = null;
 
   try {
     leads = await API.leads.list();
@@ -11,7 +13,18 @@ async function renderAnalytics() {
     metrics = Store.getMetrics();
   }
 
-  const campaigns = Store.getCampaigns();
+  try {
+    campaigns = await API.campaigns.list();
+    Store._state.campaigns = campaigns;
+  } catch (err) {
+    campaigns = [];
+  }
+
+  try {
+    emailAnalytics = await API.campaigns.analyticsOverview();
+  } catch (err) {
+    emailAnalytics = null;
+  }
 
   const industryBreakdown = {};
   leads.forEach(l => { industryBreakdown[l.industry || 'Unknown'] = (industryBreakdown[l.industry || 'Unknown'] || 0) + 1; });
@@ -30,25 +43,48 @@ async function renderAnalytics() {
   PIPELINE.forEach(s => { pipeline[s] = 0; });
   leads.forEach(l => { if (pipeline[l.status] !== undefined) pipeline[l.status]++; });
 
-  const totalSent = campaigns.reduce((s, c) => s + c.sent, 0);
+  const totalSent = emailAnalytics?.totalSends || campaigns.reduce((s, c) => s + c.sent, 0);
+  const totalOpened = emailAnalytics?.totalOpened || campaigns.reduce((s, c) => s + c.opened, 0);
+  const totalClicked = emailAnalytics?.totalClicked || campaigns.reduce((s, c) => s + c.clicked, 0);
+  const totalReplied = emailAnalytics?.totalReplies || 0;
+  const totalBounced = emailAnalytics?.totalBounced || 0;
   const activeCampaigns = campaigns.filter(c => c.status === 'active').length;
+
+  const overallOpenRate = emailAnalytics?.overallOpenRate || (totalSent ? ((totalOpened / totalSent) * 100).toFixed(1) : '0.0');
+  const overallClickRate = emailAnalytics?.overallClickRate || (totalSent ? ((totalClicked / totalSent) * 100).toFixed(1) : '0.0');
+  const overallReplyRate = emailAnalytics?.overallReplyRate || (totalSent ? ((totalReplied / totalSent) * 100).toFixed(1) : '0.0');
+
+  const perCampaign = emailAnalytics?.perCampaign || campaigns.filter(c => c.sent > 0).map(c => ({
+    id: c.id, name: c.name, status: c.status, sent: c.sent, opened: c.opened,
+    clicked: c.clicked, replied: c.replied, bounced: c.bounced, createdAt: c.createdAt,
+    openRate: c.sent ? ((c.opened / c.sent) * 100).toFixed(1) : '0.0',
+    clickRate: c.sent ? ((c.clicked / c.sent) * 100).toFixed(1) : '0.0',
+  }));
 
   const html = `
     <div class="page-head">
       <div>
         <h1 class="page-title">Analytics</h1>
-        <p class="page-sub">Performance insights across your lead engine.</p>
+        <p class="page-sub">Performance insights across your lead engine and email campaigns.</p>
       </div>
       <div class="page-actions">
         <button class="btn btn-secondary" data-action="export-report">${icon('download')} Export Report</button>
       </div>
     </div>
 
-    <div class="metrics">
+    <div class="metrics" style="grid-template-columns:repeat(6,1fr)">
       ${metricCard('users', 'i-indigo', metrics.totalLeads, 'Total Leads')}
-      ${metricCard('trendingUp', 'i-green', metrics.avgScore, 'Avg Score')}
       ${metricCard('send', 'i-blue', UI.formatNumber(totalSent), 'Emails Sent')}
-      ${metricCard('zap', 'i-amber', activeCampaigns, 'Active Campaigns')}
+      ${metricCard('eye', 'i-teal', UI.formatNumber(totalOpened), 'Opened')}
+      ${metricCard('externalLink', 'i-amber', UI.formatNumber(totalClicked), 'Clicked')}
+      ${metricCard('messageSquare', 'i-green', UI.formatNumber(totalReplied), 'Replied')}
+      ${metricCard('alertCircle', 'i-red', UI.formatNumber(totalBounced), 'Bounced')}
+    </div>
+
+    <div class="metrics mt12" style="grid-template-columns:repeat(3,1fr)">
+      ${metricCard('trendingUp', 'i-teal', overallOpenRate + '%', 'Open Rate')}
+      ${metricCard('externalLink', 'i-amber', overallClickRate + '%', 'Click Rate')}
+      ${metricCard('messageSquare', 'i-green', overallReplyRate + '%', 'Reply Rate')}
     </div>
 
     <div class="grid-2 mt24">
@@ -75,6 +111,43 @@ async function renderAnalytics() {
 
         <div class="card">
           <div class="card-head">
+            <div class="card-title">Email Engagement Funnel</div>
+          </div>
+          <div class="funnel">
+            <div class="fn-row">
+              <div class="fn-label">Sent</div>
+              <div class="fn-track"><div class="fn-bar" style="width:100%"></div></div>
+              <div class="fn-val">${totalSent}</div>
+            </div>
+            <div class="fn-row">
+              <div class="fn-label">Opened</div>
+              <div class="fn-track"><div class="fn-bar" style="width:${totalSent ? (totalOpened/totalSent)*100 : 0}%"></div></div>
+              <div class="fn-val">${totalOpened}</div>
+              <div class="fn-conv">${overallOpenRate}%</div>
+            </div>
+            <div class="fn-row">
+              <div class="fn-label">Clicked</div>
+              <div class="fn-track"><div class="fn-bar" style="width:${totalSent ? (totalClicked/totalSent)*100 : 0}%"></div></div>
+              <div class="fn-val">${totalClicked}</div>
+              <div class="fn-conv">${overallClickRate}%</div>
+            </div>
+            <div class="fn-row">
+              <div class="fn-label">Replied</div>
+              <div class="fn-track"><div class="fn-bar" style="width:${totalSent ? (totalReplied/totalSent)*100 : 0}%"></div></div>
+              <div class="fn-val">${totalReplied}</div>
+              <div class="fn-conv">${overallReplyRate}%</div>
+            </div>
+            <div class="fn-row">
+              <div class="fn-label">Bounced</div>
+              <div class="fn-track"><div class="fn-bar" style="width:${totalSent ? (totalBounced/totalSent)*100 : 0}%"></div></div>
+              <div class="fn-val">${totalBounced}</div>
+              <div class="fn-conv">${emailAnalytics?.bounceRate || (totalSent ? ((totalBounced / totalSent) * 100).toFixed(1) : '0.0')}%</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
             <div class="card-title">Lead Sources</div>
           </div>
           <div class="card-body" style="padding:16px 20px">
@@ -90,6 +163,45 @@ async function renderAnalytics() {
       </div>
 
       <div class="dash-col">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-title">${icon('barChart', 'ic-16')} Campaign Tracking Overview</div>
+              <div class="card-sub">Per-campaign open, click, and reply rates</div>
+            </div>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Campaign</th>
+                  <th>Status</th>
+                  <th>Sent</th>
+                  <th>Opened</th>
+                  <th>Clicked</th>
+                  <th>Replies</th>
+                  <th>Open %</th>
+                  <th>Click %</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${perCampaign.length ? perCampaign.slice(0, 10).map(c => `
+                  <tr>
+                    <td><div class="cell-main" style="font-size:12.5px">${escapeHtml(c.name)}</div></td>
+                    <td>${campaignBadge(c.status)}</td>
+                    <td>${c.sent}</td>
+                    <td>${c.opened || 0}</td>
+                    <td>${c.clicked || 0}</td>
+                    <td>${c.replied || 0}</td>
+                    <td>${ring(parseFloat(c.openRate) || 0, 'sm')}</td>
+                    <td>${ring(parseFloat(c.clickRate) || 0, 'sm')}</td>
+                  </tr>
+                `).join('') : `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-3)">No campaigns with sends yet</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-head">
             <div class="card-title">Top Industries</div>
@@ -120,33 +232,6 @@ async function renderAnalytics() {
                 </div>
               `).join('') || '<p class="muted small" style="text-align:center;padding:20px;grid-column:1/-1">No leads yet</p>'}
             </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-head">
-            <div class="card-title">Campaign Performance</div>
-          </div>
-          <div class="tbl-wrap">
-            <table class="tbl">
-              <thead>
-                <tr><th>Campaign</th><th>Status</th><th>Sent</th><th>Open %</th><th>Reply %</th></tr>
-              </thead>
-              <tbody>
-                ${campaigns.filter(c => c.sent > 0).slice(0, 6).map(c => {
-                  const openRate = Math.round((c.opened / c.sent) * 100);
-                  const replyRate = Math.round((c.replied / c.sent) * 100);
-                  return `
-                    <tr>
-                      <td><div class="cell-main" style="font-size:12.5px">${escapeHtml(c.name)}</div></td>
-                      <td>${campaignBadge(c.status)}</td>
-                      <td>${c.sent}</td>
-                      <td>${openRate}%</td>
-                      <td>${replyRate}%</td>
-                    </tr>`;
-                }).join('')}
-              </tbody>
-            </table>
           </div>
         </div>
       </div>

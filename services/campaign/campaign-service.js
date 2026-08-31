@@ -128,7 +128,7 @@ async function sendCampaign(campaignId) {
         WHERE campaignId = ? AND leadId = ?
       `).run(result.messageId, campaignId, lead.leadId);
 
-      db.prepare('UPDATE campaigns SET sent = sent + 1 WHERE id = ?').run(campaignId);
+      db.prepare('UPDATE campaigns SET sent = sent + 1, delivered = delivered + 1 WHERE id = ?').run(campaignId);
       sent++;
     } catch (err) {
       db.prepare("UPDATE campaign_leads SET status = 'failed' WHERE campaignId = ? AND leadId = ?").run(campaignId, lead.leadId);
@@ -173,8 +173,8 @@ function getAllMetrics() {
     FROM campaigns
   `).get();
 
-  const replyCount = db.prepare('SELECT COUNT(*) as count FROM email_replies').get().count;
-  const positiveCount = db.prepare("SELECT COUNT(*) as count FROM email_replies WHERE sentiment = 'positive'").get().count;
+  const replyCount = db.prepare('SELECT COUNT(*) as count FROM email_replies WHERE campaignId IS NOT NULL').get().count;
+  const positiveCount = db.prepare("SELECT COUNT(*) as count FROM email_replies WHERE sentiment = 'positive' AND campaignId IS NOT NULL").get().count;
 
   return {
     ...totals,

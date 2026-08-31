@@ -5,11 +5,11 @@ const Store = {
   init() {
     this._state = {
       currentView: 'dashboard',
-      leads: [...MOCK_LEADS],
-      campaigns: [...MOCK_CAMPAIGNS],
-      activities: [...MOCK_ACTIVITIES],
-      replies: [...MOCK_REPLIES],
-      discover: [...MOCK_DISCOVER],
+      leads: [],
+      campaigns: [],
+      activities: [],
+      replies: [],
+      discover: [],
       sidebarOpen: false,
       selectedLeadId: null,
       selectedCampaignId: null,

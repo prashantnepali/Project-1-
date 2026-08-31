@@ -106,7 +106,10 @@ const API = {
     metrics: () => API.get('/campaigns/metrics'),
     assignLeads: (id, leadIds) => API.post(`/campaigns/${id}/leads`, { leadIds }),
     getLeads: (id) => API.get(`/campaigns/${id}/leads`),
+    removeLead: (id, leadId) => API.del(`/campaigns/${id}/leads/${leadId}`),
     send: (id) => API.post(`/campaigns/${id}/send`),
+    tracking: (id) => API.get(`/campaigns/${id}/tracking`),
+    analyticsOverview: () => API.get('/campaigns/analytics/overview'),
   },
 
   emails: {

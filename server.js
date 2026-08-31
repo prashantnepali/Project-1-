@@ -47,6 +47,7 @@ app.use('/api/activities', require('./routes/activities'));
 app.use('/api/settings', require('./routes/settings'));
 app.use('/api/campaigns', require('./routes/campaigns'));
 app.use('/api/emails', require('./routes/emails'));
+app.use('/api/tracking', require('./routes/tracking'));
 app.use('/api', require('./routes/auth'));
 
 app.delete('/api/data', (req, res) => {

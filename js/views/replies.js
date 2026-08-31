@@ -186,8 +186,10 @@ function bindReplyEvents() {
     try {
       const accounts = await API.accounts.list();
       if (!accounts.length) return UI.toast('No connected accounts');
+      const gmailAccounts = accounts.filter(a => a.provider === 'google');
+      if (!gmailAccounts.length) return UI.toast('No Gmail accounts connected. Reply sync requires Gmail.', 'error');
       UI.toast('Syncing replies...');
-      const result = await API.emails.syncReplies(accounts[0].id);
+      const result = await API.emails.syncReplies(gmailAccounts[0].id);
       UI.toast(`Synced ${result.synced} new replies from ${result.total} messages.`);
       renderReplies();
     } catch (err) {

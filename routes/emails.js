@@ -10,6 +10,21 @@ router.post('/send', async (req, res) => {
       return res.status(400).json({ error: 'accountId, to, and subject are required' });
     }
     const result = await emailService.sendSingle(accountId, { to, subject, text, html, leadId, campaignId, inReplyTo, references });
+
+    // Track activity for all email sends
+    const { getDb } = require('../db/connection');
+    const { genId } = require('../services/helpers');
+    const db = getDb();
+    db.prepare(`
+      INSERT INTO activities (id, leadId, companyId, type, description, metadata, timestamp)
+      VALUES (?, ?, ?, 'email_sent', ?, ?, ?)
+    `).run(
+      genId(), leadId || null, null,
+      `Sent email to ${to}: ${subject}`,
+      JSON.stringify({ messageId: result.messageId, threadId: result.threadId, campaignId }),
+      new Date().toISOString()
+    );
+
     res.json(result);
   } catch (err) {
     res.status(400).json({ error: err.message });

@@ -181,6 +181,16 @@ function bindCampaignEvents() {
   UI.delegate('#view', '[data-action="new-campaign"]', 'click', () => {
     showNewCampaignModal();
   });
+
+  UI.delegate('#view', '[data-campaign-edit]', 'click', async (e, el) => {
+    e.stopPropagation();
+    try {
+      const c = await API.campaigns.get(el.dataset.campaignEdit);
+      showEditCampaignModal(c);
+    } catch (err) {
+      UI.toast('Failed to load campaign: ' + err.message);
+    }
+  });
 }
 
 async function showCampaignDetail(c) {
@@ -279,9 +289,13 @@ async function showCampaignDetail(c) {
   UI.delegate('.modal-overlay', `[data-campaign-remove-lead="${c.id}"]`, 'click', async (e, el) => {
     if (!confirm('Remove this lead from the campaign?')) return;
     try {
-      await API.campaigns.assignLeads(c.id, [el.dataset.leadId]); // This won't work for remove, need a delete endpoint
+      await API.campaigns.removeLead(c.id, el.dataset.leadId);
+      UI.toast('Lead removed from campaign.');
+      document.querySelector('.modal-overlay')?.remove();
+      const updated = await API.campaigns.get(c.id);
+      showCampaignDetail(updated);
     } catch (err) {
-      UI.toast('Failed to remove lead');
+      UI.toast('Failed to remove lead: ' + err.message);
     }
   });
 }
@@ -621,4 +635,61 @@ async function showNewCampaignModal() {
   }
 
   renderStep();
+}
+
+function showEditCampaignModal(c) {
+  let accounts = [];
+  try {
+    accounts = API.accounts.list ? [] : [];
+  } catch (e) {}
+
+  const body = `
+    <form id="edit-campaign-form" class="form-grid">
+      <div class="form-group">
+        <label>Campaign Name</label>
+        <input type="text" name="name" value="${escapeHtml(c.name)}" required>
+      </div>
+      <div class="form-group">
+        <label>Subject Line</label>
+        <input type="text" name="subject" value="${escapeHtml(c.subject || '')}" required>
+      </div>
+      <div class="form-group">
+        <label>Email Body <span class="em-lbl-opt">HTML supported</span></label>
+        <textarea name="body" rows="6">${escapeHtml(c.body || '')}</textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Status</label>
+          <select name="status">
+            <option value="draft" ${c.status === 'draft' ? 'selected' : ''}>Draft</option>
+            <option value="paused" ${c.status === 'paused' ? 'selected' : ''}>Paused</option>
+            <option value="active" ${c.status === 'active' ? 'selected' : ''}>Active</option>
+          </select>
+        </div>
+      </div>
+    </form>`;
+
+  const footer = `
+    <button class="btn btn-ghost" data-close-modal>Cancel</button>
+    <button class="btn btn-primary" id="save-edit-campaign">${icon('save')} Save Changes</button>`;
+
+  UI.modal('Edit Campaign', body, { wide: true, footer });
+
+  UI.on('#save-edit-campaign', 'click', async () => {
+    const form = document.getElementById('edit-campaign-form');
+    const fd = new FormData(form);
+    try {
+      await API.campaigns.update(c.id, {
+        name: fd.get('name').trim(),
+        subject: fd.get('subject').trim(),
+        body: fd.get('body').trim(),
+        status: fd.get('status'),
+      });
+      UI.closeModal();
+      UI.toast('Campaign updated.');
+      renderCampaigns();
+    } catch (err) {
+      UI.toast('Failed to update campaign: ' + err.message, 'error');
+    }
+  });
 }

@@ -1,6 +1,6 @@
 {
   "name": "samparka-lead-engine",
-  "version": "2.1.0",
+  "version": "3.0.0",
   "description": "Samparka Lead Engine — International lead intelligence and outreach platform",
   "main": "server.js",
   "scripts": {

@@ -22,8 +22,24 @@ async function renderDashboard() {
     activities = Store.getActivities().slice(0, 8);
   }
 
-  const campaigns = Store.getCampaigns();
-  const replies = Store.getReplies();
+  let campaigns = [];
+  let replies = [];
+
+  try {
+    campaigns = await API.campaigns.list();
+    if (gen !== getRenderGeneration()) return;
+    Store._state.campaigns = campaigns;
+  } catch (err) {
+    campaigns = Store.getCampaigns();
+  }
+
+  try {
+    replies = await API.emails.replies();
+    if (gen !== getRenderGeneration()) return;
+    Store._state.replies = replies;
+  } catch (err) {
+    replies = Store.getReplies();
+  }
   const recentLeads = leads.slice(0, 5);
   const topPerformers = [...leads].sort((a, b) => (b.fitScore || b.score || 0) - (a.fitScore || a.score || 0)).slice(0, 5);
 
@@ -41,11 +57,11 @@ async function renderDashboard() {
         <h1 class="page-title">Dashboard</h1>
         <p class="page-sub">Welcome back, Prashant. Here's your lead engine overview.</p>
       </div>
-<div class="page-actions">
-          <button class="btn btn-secondary" data-action="export">${icon('download')} Export</button>
-          <button class="btn btn-secondary" data-action="send-email">${icon('send')} Send Email</button>
-          <button class="btn btn-primary" data-action="add-lead">${icon('plus')} Add Lead</button>
-        </div>
+      <div class="page-actions">
+        <button class="btn btn-secondary" data-action="export">${icon('download')} Export</button>
+        <button class="btn btn-secondary" data-action="send-email">${icon('send')} Send Email</button>
+        <button class="btn btn-primary" data-action="add-lead">${icon('plus')} Add Lead</button>
+      </div>
     </div>
 
     <div class="metrics">
@@ -62,7 +78,7 @@ async function renderDashboard() {
         <div class="card">
           <div class="card-head">
             <div>
-              <div class="card-title">Pipeline Overview</div>
+              <div class="card-title">${icon('barChart', 'ic-16')} Pipeline Overview</div>
               <div class="card-sub">Leads across pipeline stages</div>
             </div>
             <button class="btn btn-sm btn-ghost" data-nav="leads">${icon('arrowRight')} View All</button>
@@ -84,7 +100,7 @@ async function renderDashboard() {
         <div class="card">
           <div class="card-head">
             <div>
-              <div class="card-title">Recent Leads</div>
+              <div class="card-title">${icon('users', 'ic-16')} Recent Leads</div>
               <div class="card-sub">Latest leads added to the engine</div>
             </div>
           </div>
@@ -116,7 +132,7 @@ async function renderDashboard() {
                     <td>${ring(l.fitScore || l.score || 0, 'sm')}</td>
                     <td><button class="ibtn" data-lead-view="${l.id}">${icon('eye', 'ic-14')}</button></td>
                   </tr>
-                `).join('') : `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-3)">No leads yet. Use Discover to find businesses.</td></tr>`}
+                `).join('') : `<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-3)"><div style="margin-bottom:8px">${icon('users')}</div>No leads yet. Use Discover to find businesses.</td></tr>`}
               </tbody>
             </table>
           </div>
@@ -127,7 +143,7 @@ async function renderDashboard() {
         <div class="card">
           <div class="card-head">
             <div>
-              <div class="card-title">Activity Feed</div>
+              <div class="card-title">${icon('activity', 'ic-16')} Activity Feed</div>
               <div class="card-sub">Recent actions across the platform</div>
             </div>
           </div>
@@ -140,22 +156,22 @@ async function renderDashboard() {
                   <time>${UI.formatDate(a.timestamp)}</time>
                 </div>
               </div>
-            `).join('') : '<div class="act-item" style="justify-content:center;color:var(--text-3)">No activities yet</div>'}
+            `).join('') : '<div class="act-item" style="justify-content:center;color:var(--text-3);padding:32px">No activities yet</div>'}
           </div>
         </div>
 
         <div class="card">
           <div class="card-head">
             <div>
-              <div class="card-title">Top Performers</div>
+              <div class="card-title">${icon('award', 'ic-16')} Top Performers</div>
               <div class="card-sub">Leads with highest fit scores</div>
             </div>
           </div>
           <div class="card-body" style="padding:0">
             ${topPerformers.length ? topPerformers.map((l, i) => `
               <div class="att-item">
-                <div class="row" style="gap:8px">
-                  <span style="font-weight:800;color:var(--text-3);font-size:13px;width:18px">${i + 1}</span>
+                <div class="row" style="gap:10px">
+                  <span style="font-weight:800;color:${i === 0 ? 'var(--brand)' : 'var(--text-3)'};font-size:14px;width:20px">${i + 1}</span>
                   ${avatar(l.name, 'sm')}
                   <div>
                     <div class="att-name">${escapeHtml(l.name)}</div>
@@ -166,7 +182,7 @@ async function renderDashboard() {
                   ${ring(l.fitScore || l.score || 0, 'sm')}
                 </div>
               </div>
-            `).join('') : '<div class="att-item" style="justify-content:center;color:var(--text-3)">No leads yet</div>'}
+            `).join('') : '<div class="att-item" style="justify-content:center;color:var(--text-3);padding:32px">No leads yet</div>'}
           </div>
         </div>
       </div>
@@ -180,7 +196,7 @@ async function renderDashboard() {
 function getActivityIcon(type) {
   const map = {
     email_sent: 'send', email_opened: 'eye', email_replied: 'messageSquare',
-    status_changed: 'refreshCw', note_added: 'edit', call_made: 'phone',
+    link_clicked: 'externalLink', status_changed: 'refreshCw', note_added: 'edit', call_made: 'phone',
     linkedin_connect: 'externalLink', company_discovered: 'search',
     research_completed: 'zap', added_to_leads: 'plus',
     manual_add: 'user', prequalification: 'checkCircle',
@@ -191,7 +207,7 @@ function getActivityIcon(type) {
 function getActivityIconCls(type) {
   const map = {
     email_sent: 'i-blue', email_opened: 'i-indigo', email_replied: 'i-green',
-    status_changed: 'i-amber', note_added: 'i-teal', call_made: 'i-purple',
+    link_clicked: 'i-amber', status_changed: 'i-amber', note_added: 'i-teal', call_made: 'i-purple',
     linkedin_connect: 'i-slate', company_discovered: 'i-blue',
     research_completed: 'i-amber', added_to_leads: 'i-green',
     manual_add: 'i-indigo', prequalification: 'i-teal',

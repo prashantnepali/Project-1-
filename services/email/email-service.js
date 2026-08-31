@@ -25,6 +25,37 @@ function replacePlaceholders(template, lead, company) {
     .replace(/\{\{name\}\}/g, lead.name || '');
 }
 
+function injectTracking(html, sendId) {
+  if (!html) return html;
+
+  const BASE_URL = process.env.BASE_URL || 'http://localhost:3001';
+
+  // Inject tracking pixel
+  const pixelUrl = `${BASE_URL}/api/tracking/open/${sendId}`;
+  const pixel = `<img src="${pixelUrl}" width="1" height="1" style="display:none" alt="" />`;
+  let trackedHtml = html;
+
+  // Insert before </body> or at end
+  if (trackedHtml.toLowerCase().includes('</body>')) {
+    trackedHtml = trackedHtml.replace(/<\/body>/i, `${pixel}</body>`);
+  } else {
+    trackedHtml += pixel;
+  }
+
+  // Wrap links with click tracking
+  trackedHtml = trackedHtml.replace(
+    /<a\s+[^>]*href="(https?:\/\/[^"]+)"[^>]*>/gi,
+    (match, url) => {
+      // Don't track anchor links or tracking pixel URLs
+      if (url.includes('/api/tracking/') || url.startsWith('#')) return match;
+      const trackedUrl = `${BASE_URL}/api/tracking/click/${sendId}?url=${encodeURIComponent(url)}`;
+      return match.replace(url, trackedUrl);
+    }
+  );
+
+  return trackedHtml;
+}
+
 async function sendSingle(accountId, { to, subject, text, html, leadId, campaignId, inReplyTo, references }) {
   const db = getDb();
   const account = getAccount(accountId);
@@ -33,11 +64,14 @@ async function sendSingle(accountId, { to, subject, text, html, leadId, campaign
 
   const id = genId();
   try {
+    // Inject tracking into HTML before sending
+    const trackedHtml = injectTracking(html, id);
+
     let result;
     if (account.provider === 'smtp') {
-      result = await smtp.sendEmail(account, { to, subject, text, html, inReplyTo, references });
+      result = await smtp.sendEmail(account, { to, subject, text, html: trackedHtml, inReplyTo, references });
     } else {
-      result = await gmail.sendEmail(account, { to, subject, text, html, inReplyTo, references });
+      result = await gmail.sendEmail(account, { to, subject, text, html: trackedHtml, inReplyTo, references });
     }
 
     db.prepare(`
@@ -79,6 +113,7 @@ async function syncReplies(accountId) {
   const db = getDb();
   const account = getAccount(accountId);
   if (!account) throw new Error('Account not found');
+  if (account.provider !== 'google') throw new Error('Reply sync is only available for Gmail accounts. SMTP accounts cannot sync inbound replies.');
 
   const lastReply = db.prepare(
     'SELECT receivedAt FROM email_replies WHERE accountId = ? ORDER BY receivedAt DESC LIMIT 1'
@@ -133,15 +168,17 @@ async function syncReplies(accountId) {
     );
 
     if (leadMatch?.id) {
-      db.prepare(`UPDATE leads SET lastActivity = datetime('now'), status = 'replied' WHERE id = ?`).run(leadMatch.id);
+      const now = new Date().toISOString();
+      db.prepare(`UPDATE leads SET lastActivity = ?, status = 'replied' WHERE id = ?`).run(now, leadMatch.id);
 
       db.prepare(`
         INSERT INTO activities (id, leadId, companyId, type, description, metadata, timestamp)
-        VALUES (?, ?, ?, 'reply_received', ?, ?, datetime('now'))
+        VALUES (?, ?, ?, 'reply_received', ?, ?, ?)
       `).run(
         genId(), leadMatch.id, null,
         `Reply received from ${fromEmail}: ${full.subject || '(no subject)'}`,
-        JSON.stringify({ messageId: full.id, threadId: full.threadId, campaignId })
+        JSON.stringify({ messageId: full.id, threadId: full.threadId, campaignId }),
+        now
       );
     }
 
