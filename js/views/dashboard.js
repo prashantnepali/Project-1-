@@ -40,6 +40,19 @@ async function renderDashboard() {
   } catch (err) {
     replies = Store.getReplies();
   }
+
+  let dealMetrics = { totalDeals: 0, wonValue: 0, pipelineValue: 0, conversionRate: '0.0' };
+  try {
+    dealMetrics = await API.deals.metrics();
+    if (gen !== getRenderGeneration()) return;
+  } catch (e) {}
+
+  let taskStats = { total: 0, overdue: 0, pending: 0, completed: 0 };
+  try {
+    taskStats = await API.tasks.stats();
+    if (gen !== getRenderGeneration()) return;
+  } catch (e) {}
+
   const recentLeads = leads.slice(0, 5);
   const topPerformers = [...leads].sort((a, b) => (b.fitScore || b.score || 0) - (a.fitScore || a.score || 0)).slice(0, 5);
 
@@ -70,7 +83,9 @@ async function renderDashboard() {
       ${metricCard('trendingUp', 'i-purple', metrics.qualified, 'Qualified')}
       ${metricCard('send', 'i-amber', totalSent, 'Emails Sent')}
       ${metricCard('messageSquare', 'i-teal', totalReplied, 'Replies')}
-      ${metricCard('target', 'i-green', metrics.avgScore, 'Avg Score')}
+      ${metricCard('target', 'i-indigo', dealMetrics.totalDeals, 'Deals')}
+      ${metricCard('dollarSign', 'i-green', '$' + (dealMetrics.wonValue >= 1000 ? (dealMetrics.wonValue / 1000).toFixed(0) + 'K' : dealMetrics.wonValue), 'Won')}
+      ${metricCard('clock', 'i-amber', taskStats.pending, 'Tasks Due')}
     </div>
 
     <div class="dash-grid mt24">

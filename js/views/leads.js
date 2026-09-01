@@ -277,6 +277,35 @@ async function renderLeadDetail(id) {
           </div>
         </div>` : ''}
 
+        ${lead.engagementScore !== undefined ? `
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">${icon('activity', 'ic-16')} Engagement Score</div>
+          </div>
+          <div class="card-body" style="text-align:center">
+            ${ring(lead.engagementScore, 'lg')}
+            <p class="muted small mt8">Based on email opens, clicks, and replies</p>
+          </div>
+          ${lead.engagementBreakdown ? `
+          <div class="card-body" style="padding:12px 20px">
+            <div class="fn-row" style="margin-bottom:6px">
+              <div class="fn-label" style="width:auto;min-width:100px;font-size:12.5px">Opens (${lead.engagementBreakdown.opens})</div>
+              <div class="fn-track" style="flex:1"><div class="fn-bar" style="width:${(lead.engagementBreakdown.openPoints / 15) * 100}%"></div></div>
+              <div class="fn-val" style="font-size:12.5px">+${lead.engagementBreakdown.openPoints}</div>
+            </div>
+            <div class="fn-row" style="margin-bottom:6px">
+              <div class="fn-label" style="width:auto;min-width:100px;font-size:12.5px">Clicks (${lead.engagementBreakdown.clicks})</div>
+              <div class="fn-track" style="flex:1"><div class="fn-bar" style="width:${(lead.engagementBreakdown.clickPoints / 20) * 100}%"></div></div>
+              <div class="fn-val" style="font-size:12.5px">+${lead.engagementBreakdown.clickPoints}</div>
+            </div>
+            <div class="fn-row" style="margin-bottom:6px">
+              <div class="fn-label" style="width:auto;min-width:100px;font-size:12.5px">Replies (${lead.engagementBreakdown.replies})</div>
+              <div class="fn-track" style="flex:1"><div class="fn-bar" style="width:${(lead.engagementBreakdown.replyPoints / 25) * 100}%"></div></div>
+              <div class="fn-val" style="font-size:12.5px">+${lead.engagementBreakdown.replyPoints}</div>
+            </div>
+          </div>` : ''}
+        </div>` : ''}
+
         ${enrichmentData.companyIntelligence || enrichmentData.loyaltyProgram ? `
         <div class="card">
           <div class="card-head">

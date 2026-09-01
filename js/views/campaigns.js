@@ -547,7 +547,18 @@ async function showNewCampaignModal() {
     }
 
     if (state.step === 4) {
+      // Load templates for picker
+      let tplOptions = '<option value="">— Write from scratch —</option>';
+      try {
+        const tpls = await API.templates.list();
+        tplOptions += tpls.map(t => `<option value="${t.id}" data-subject="${escapeHtml(t.subject || '')}" data-body="${escapeHtml(t.body || '')}">${escapeHtml(t.name)} (${TEMPLATE_CATEGORIES[t.category] || t.category})</option>`).join('');
+      } catch (e) {}
+
       body.innerHTML = `
+        <div class="form-group">
+          <label>${icon('fileText', 'ic-14')} Load Template</label>
+          <select id="wc-template-pick">${tplOptions}</select>
+        </div>
         <div class="form-group">
           <label>${icon('type', 'ic-14')} Subject Line</label>
           <input name="subject" placeholder="e.g. Quick question about {{company}}" value="${escapeHtml(state.subject)}" />
@@ -560,6 +571,21 @@ async function showNewCampaignModal() {
           ${placeholders.map(p => `<button type="button" class="em-chip" data-ph="${p}">${p}</button>`).join('')}
           <span class="em-chip-hint">Click to insert</span>
         </div>`;
+
+      // Template picker
+      body.querySelector('#wc-template-pick').addEventListener('change', (e) => {
+        const opt = e.target.selectedOptions[0];
+        if (opt && opt.value) {
+          const subj = opt.dataset.subject || '';
+          const bd = opt.dataset.body || '';
+          body.querySelector('input[name="subject"]').value = subj;
+          body.querySelector('textarea[name="body"]').value = bd;
+          state.subject = subj;
+          state.body = bd;
+          // Increment usage
+          API.templates.use(opt.value).catch(() => {});
+        }
+      });
       foot.innerHTML = `
         <button class="btn btn-ghost" data-wc-back>${icon('arrowLeft')} Back</button>
         <button class="btn btn-primary" data-wc-save>${icon('save')} Save Campaign</button>`;

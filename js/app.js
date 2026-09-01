@@ -4,8 +4,11 @@ const VIEWS = {
   dashboard: renderDashboard,
   discover: renderDiscover,
   leads: renderLeads,
+  deals: renderDeals,
   campaigns: renderCampaigns,
   replies: renderReplies,
+  tasks: renderTasks,
+  templates: renderTemplates,
   analytics: renderAnalytics,
   settings: renderSettings,
 };

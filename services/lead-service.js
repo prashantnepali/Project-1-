@@ -135,6 +135,9 @@ function getLeadById(id) {
   const evidenceItems = lead.companyId ? db.prepare(`SELECT * FROM evidence WHERE companyId = ? ORDER BY confidence DESC`).all(lead.companyId) : [];
   const enrichment = lead.companyId ? db.prepare(`SELECT data FROM enrichments WHERE companyId = ? AND status = 'completed' ORDER BY version DESC LIMIT 1`).get(lead.companyId) : null;
 
+  // Calculate engagement score
+  const engagement = calculateEngagementScore(db, id);
+
   return {
     ...lead,
     companyData: company,
@@ -143,6 +146,8 @@ function getLeadById(id) {
     evidence: evidenceItems,
     enrichmentData: enrichment ? JSON.parse(enrichment.data || '{}') : null,
     tags: JSON.parse(lead.tags || '[]'),
+    engagementScore: engagement.score,
+    engagementBreakdown: engagement.breakdown,
   };
 }
 
@@ -235,4 +240,21 @@ function getMetrics() {
   };
 }
 
-module.exports = { addToLeads, getLeads, getLeadById, updateLead, deleteLead, addManualLead, getMetrics, addActivity };
+function calculateEngagementScore(db, leadId) {
+  const sends = db.prepare('SELECT COUNT(*) as c FROM email_sends WHERE leadId = ?').get(leadId).c;
+  const opens = db.prepare('SELECT COUNT(*) as c FROM email_sends WHERE leadId = ? AND openedAt IS NOT NULL').get(leadId).c;
+  const clicks = db.prepare('SELECT COUNT(*) as c FROM email_sends WHERE leadId = ? AND clickedAt IS NOT NULL').get(leadId).c;
+  const replies = db.prepare('SELECT COUNT(*) as c FROM email_replies WHERE leadId = ?').get(leadId).c;
+
+  const openPoints = Math.min(opens * 5, 15);
+  const clickPoints = Math.min(clicks * 10, 20);
+  const replyPoints = Math.min(replies * 25, 25);
+  const total = openPoints + clickPoints + replyPoints;
+
+  return {
+    score: total,
+    breakdown: { opens, clicks, replies, sends, openPoints, clickPoints, replyPoints },
+  };
+}
+
+module.exports = { addToLeads, getLeads, getLeadById, updateLead, deleteLead, addManualLead, getMetrics, addActivity, calculateEngagementScore };

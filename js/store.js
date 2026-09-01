@@ -13,6 +13,9 @@ const Store = {
       sidebarOpen: false,
       selectedLeadId: null,
       selectedCampaignId: null,
+      deals: [],
+      tasks: [],
+      taskFilter: 'pending',
       searchQuery: '',
       filters: {
         status: '',

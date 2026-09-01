@@ -283,6 +283,54 @@ function initSchema() {
       FOREIGN KEY (leadId) REFERENCES leads(id) ON DELETE SET NULL
     );
 
+    CREATE TABLE IF NOT EXISTS deals (
+      id TEXT PRIMARY KEY,
+      leadId TEXT,
+      campaignId TEXT,
+      name TEXT NOT NULL,
+      value REAL DEFAULT 0,
+      currency TEXT DEFAULT 'USD',
+      stage TEXT DEFAULT 'lead',
+      probability INTEGER DEFAULT 10,
+      expectedCloseDate TEXT,
+      actualCloseDate TEXT,
+      notes TEXT DEFAULT '',
+      createdAt TEXT DEFAULT (datetime('now')),
+      updatedAt TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (leadId) REFERENCES leads(id) ON DELETE SET NULL,
+      FOREIGN KEY (campaignId) REFERENCES campaigns(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS tasks (
+      id TEXT PRIMARY KEY,
+      leadId TEXT,
+      campaignId TEXT,
+      dealId TEXT,
+      type TEXT DEFAULT 'follow_up',
+      title TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      dueDate TEXT,
+      completedAt TEXT,
+      priority TEXT DEFAULT 'medium',
+      createdAt TEXT DEFAULT (datetime('now')),
+      updatedAt TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (leadId) REFERENCES leads(id) ON DELETE SET NULL,
+      FOREIGN KEY (campaignId) REFERENCES campaigns(id) ON DELETE SET NULL,
+      FOREIGN KEY (dealId) REFERENCES deals(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS email_templates (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      subject TEXT DEFAULT '',
+      body TEXT DEFAULT '',
+      category TEXT DEFAULT 'custom',
+      placeholders TEXT DEFAULT '[]',
+      usageCount INTEGER DEFAULT 0,
+      createdAt TEXT DEFAULT (datetime('now')),
+      updatedAt TEXT DEFAULT (datetime('now'))
+    );
+
     CREATE INDEX IF NOT EXISTS idx_contacts_company ON contacts(companyId);
     CREATE INDEX IF NOT EXISTS idx_discovery_results_search ON discovery_results(searchId);
     CREATE INDEX IF NOT EXISTS idx_discovery_results_company ON discovery_results(companyId);
@@ -309,6 +357,12 @@ function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_email_replies_account ON email_replies(accountId);
     CREATE INDEX IF NOT EXISTS idx_email_replies_lead ON email_replies(leadId);
     CREATE INDEX IF NOT EXISTS idx_email_replies_campaign ON email_replies(campaignId);
+    CREATE INDEX IF NOT EXISTS idx_deals_lead ON deals(leadId);
+    CREATE INDEX IF NOT EXISTS idx_deals_stage ON deals(stage);
+    CREATE INDEX IF NOT EXISTS idx_tasks_lead ON tasks(leadId);
+    CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(dueDate);
+    CREATE INDEX IF NOT EXISTS idx_tasks_completed ON tasks(completedAt);
+    CREATE INDEX IF NOT EXISTS idx_email_templates_category ON email_templates(category);
 
     CREATE VIRTUAL TABLE IF NOT EXISTS leads_fts USING fts5(name, company, content='leads', content_rowid='rowid');
 

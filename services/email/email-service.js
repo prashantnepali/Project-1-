@@ -141,22 +141,23 @@ async function syncReplies(accountId) {
 
     const leadMatch = db.prepare('SELECT id FROM leads WHERE email = ?').get(fromEmail);
 
-    let campaignId = null;
-
-    if (full.threadId) {
+    let campaignId = null;    if (full.threadId) {
       const sendMatch = db.prepare('SELECT campaignId FROM email_sends WHERE threadId = ?').get(full.threadId);
       if (sendMatch?.campaignId) {
         campaignId = sendMatch.campaignId;
       }
     }
 
-    db.prepare(`
-      INSERT INTO email_replies (id, accountId, leadId, campaignId, messageId, threadId, fromEmail, toEmail, subject, body, snippet, receivedAt, createdAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-    `).run(
+    // Auto-detect sentiment from reply text
+    const sentiment = detectSentiment(full.body || full.snippet || '');
+
+    db.prepare(
+      `INSERT INTO email_replies (id, accountId, leadId, campaignId, messageId, threadId, fromEmail, toEmail, subject, body, snippet, sentiment, receivedAt, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+    ).run(
       id, accountId, leadMatch?.id || null, campaignId,
       full.id, full.threadId, fromEmail, account.email,
-      full.subject, full.body, full.snippet, full.date
+      full.subject, full.body, full.snippet, sentiment, full.date
     );
 
     db.prepare(`
@@ -234,6 +235,39 @@ function markNotificationsRead(ids = []) {
     return db.prepare(`UPDATE notifications SET read = 1 WHERE id IN (${placeholders})`).run(...ids).changes;
   }
   return db.prepare('UPDATE notifications SET read = 1').run().changes;
+}
+
+function detectSentiment(text) {
+  if (!text) return 'neutral';
+  const lower = text.toLowerCase();
+
+  const positive = [
+    'interested', 'sounds great', 'love it', 'perfect', 'yes', 'sure', 'absolutely',
+    "let's schedule", 'tell me more', 'looking forward', 'excited', 'happy to',
+    'thank you', 'great idea', 'count me in', 'i agree', 'wonderful', 'awesome',
+    'that works', 'good to hear', 'appreciate', 'congratulations', 'well done',
+  ];
+
+  const negative = [
+    'not interested', 'unsubscribe', 'stop', 'remove me', 'no thanks', 'no thank you',
+    'do not contact', 'don\'t contact', 'leave me alone', 'spam', 'go away',
+    'opt out', 'take me off', 'not a good time', 'pass', 'not now', 'never',
+    'complaint', 'report', 'block',
+  ];
+
+  let posScore = 0;
+  let negScore = 0;
+
+  for (const word of positive) {
+    if (lower.includes(word)) posScore++;
+  }
+  for (const word of negative) {
+    if (lower.includes(word)) negScore++;
+  }
+
+  if (negScore > 0 && negScore >= posScore) return 'negative';
+  if (posScore > 0) return 'positive';
+  return 'neutral';
 }
 
 module.exports = { getAccount, getAccounts, deleteAccount, replacePlaceholders, sendSingle, getReplies, syncReplies, getSends, getNotifications, countUnreadNotifications, markNotificationsRead };

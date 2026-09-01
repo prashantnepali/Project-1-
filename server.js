@@ -48,6 +48,9 @@ app.use('/api/settings', require('./routes/settings'));
 app.use('/api/campaigns', require('./routes/campaigns'));
 app.use('/api/emails', require('./routes/emails'));
 app.use('/api/tracking', require('./routes/tracking'));
+app.use('/api/deals', require('./routes/deals'));
+app.use('/api/tasks', require('./routes/tasks'));
+app.use('/api/templates', require('./routes/templates'));
 app.use('/api', require('./routes/auth'));
 
 app.delete('/api/data', (req, res) => {
@@ -55,6 +58,9 @@ app.delete('/api/data', (req, res) => {
     const { getDb } = require('./db/connection');
     const db = getDb();
     db.exec(`
+      DELETE FROM email_templates;
+      DELETE FROM tasks;
+      DELETE FROM deals;
       DELETE FROM notifications;
       DELETE FROM email_replies;
       DELETE FROM email_sends;

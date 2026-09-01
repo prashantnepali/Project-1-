@@ -131,4 +131,40 @@ const API = {
       markRead: (ids) => API.post('/emails/notifications/read', { ids: ids || [] }),
     },
   },
+
+  deals: {
+    list: (params) => {
+      const q = new URLSearchParams(params || {}).toString();
+      return API.get(`/deals${q ? '?' + q : ''}`);
+    },
+    get: (id) => API.get(`/deals/${id}`),
+    create: (data) => API.post('/deals', data),
+    update: (id, data) => API.put(`/deals/${id}`, data),
+    delete: (id) => API.del(`/deals/${id}`),
+    metrics: () => API.get('/deals/metrics/overview'),
+  },
+
+  tasks: {
+    list: (params) => {
+      const q = new URLSearchParams(params || {}).toString();
+      return API.get(`/tasks${q ? '?' + q : ''}`);
+    },
+    get: (id) => API.get(`/tasks/${id}`),
+    create: (data) => API.post('/tasks', data),
+    update: (id, data) => API.put(`/tasks/${id}`, data),
+    delete: (id) => API.del(`/tasks/${id}`),
+    stats: () => API.get('/tasks/stats'),
+  },
+
+  templates: {
+    list: (params) => {
+      const q = new URLSearchParams(params || {}).toString();
+      return API.get(`/templates${q ? '?' + q : ''}`);
+    },
+    get: (id) => API.get(`/templates/${id}`),
+    create: (data) => API.post('/templates', data),
+    update: (id, data) => API.put(`/templates/${id}`, data),
+    delete: (id) => API.del(`/templates/${id}`),
+    use: (id) => API.post(`/templates/${id}/use`),
+  },
 };

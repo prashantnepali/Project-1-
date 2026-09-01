@@ -193,6 +193,9 @@ const UI = {
           ${icon('users')} Leads
           <span class="nav-badge show">${metrics.totalLeads}</span>
         </a>
+        <a href="#" class="nav-item ${current === 'deals' ? 'active' : ''}" data-nav="deals">
+          ${icon('target')} Deals
+        </a>
         <a href="#" class="nav-item ${current === 'campaigns' ? 'active' : ''}" data-nav="campaigns">
           ${icon('send')} Campaigns
           <span class="nav-badge show">${metrics.activeCampaigns}</span>
@@ -200,6 +203,14 @@ const UI = {
         <a href="#" class="nav-item ${current === 'replies' ? 'active' : ''}" data-nav="replies">
           ${icon('messageSquare')} Replies
           ${unread > 0 ? `<span class="nav-badge show">${unread}</span>` : ''}
+        </a>
+
+        <div class="sb-sect">Sales</div>
+        <a href="#" class="nav-item ${current === 'tasks' ? 'active' : ''}" data-nav="tasks">
+          ${icon('checkSquare')} Tasks
+        </a>
+        <a href="#" class="nav-item ${current === 'templates' ? 'active' : ''}" data-nav="templates">
+          ${icon('fileText')} Templates
         </a>
 
         <div class="sb-sect">System</div>
