@@ -551,7 +551,7 @@ async function showNewCampaignModal() {
       let tplOptions = '<option value="">— Write from scratch —</option>';
       try {
         const tpls = await API.templates.list();
-        tplOptions += tpls.map(t => `<option value="${t.id}" data-subject="${escapeHtml(t.subject || '')}" data-body="${escapeHtml(t.body || '')}">${escapeHtml(t.name)} (${TEMPLATE_CATEGORIES[t.category] || t.category})</option>`).join('');
+        tplOptions += tpls.map(t => `<option value="${t.id}" data-subject="${escapeHtml(t.subject || '')}" data-body-encoded="${btoa(unescape(encodeURIComponent(t.body || '')))}">${escapeHtml(t.name)} (${escapeHtml(TEMPLATE_CATEGORIES[t.category] || t.category)})</option>`).join('');
       } catch (e) {}
 
       body.innerHTML = `
@@ -577,7 +577,7 @@ async function showNewCampaignModal() {
         const opt = e.target.selectedOptions[0];
         if (opt && opt.value) {
           const subj = opt.dataset.subject || '';
-          const bd = opt.dataset.body || '';
+          const bd = opt.dataset.bodyEncoded ? decodeURIComponent(escape(atob(opt.dataset.bodyEncoded))) : '';
           body.querySelector('input[name="subject"]').value = subj;
           body.querySelector('textarea[name="body"]').value = bd;
           state.subject = subj;

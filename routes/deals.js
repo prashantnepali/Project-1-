@@ -135,10 +135,10 @@ router.put('/:id', (req, res) => {
     if (req.body.stage && req.body.stage !== existing.stage) {
       if (req.body.stage === 'won') {
         fields.push('actualCloseDate = ?', 'probability = 100');
-        params.push(new Date().toISOString(), null); // null for second placeholder of probability=100
+        params.push(new Date().toISOString());
       } else if (req.body.stage === 'lost') {
         fields.push('actualCloseDate = ?', 'probability = 0');
-        params.push(new Date().toISOString(), null);
+        params.push(new Date().toISOString());
       }
     }
 

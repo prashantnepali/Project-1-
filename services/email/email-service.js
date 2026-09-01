@@ -249,10 +249,10 @@ function detectSentiment(text) {
   ];
 
   const negative = [
-    'not interested', 'unsubscribe', 'stop', 'remove me', 'no thanks', 'no thank you',
+    'not interested', 'unsubscribe', 'remove me', 'no thanks', 'no thank you',
     'do not contact', 'don\'t contact', 'leave me alone', 'spam', 'go away',
-    'opt out', 'take me off', 'not a good time', 'pass', 'not now', 'never',
-    'complaint', 'report', 'block',
+    'opt out', 'take me off', 'not a good time', 'not now',
+    'complaint', 'report abuse', 'stop contacting', 'stop emailing',
   ];
 
   let posScore = 0;

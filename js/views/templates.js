@@ -50,7 +50,7 @@ function templateCard(t) {
   return `
     <div class="template-card" data-template-id="${t.id}">
       <div class="template-card-head">
-        <span class="template-cat-badge">${TEMPLATE_CATEGORIES[t.category] || t.category}</span>
+        <span class="template-cat-badge">${escapeHtml(TEMPLATE_CATEGORIES[t.category] || t.category)}</span>
         <span class="template-usage">${t.usageCount || 0} uses</span>
       </div>
       <div class="template-card-name">${escapeHtml(t.name)}</div>
@@ -183,8 +183,7 @@ function showTemplateDetail(template) {
   const body = `
     <div class="template-detail">
       <div class="template-detail-row">
-        <span class="info-label">Category</span>
-        <span class="template-cat-badge">${TEMPLATE_CATEGORIES[template.category] || template.category}</span>
+        <span class="info-label">Category</span>          <span class="template-cat-badge">${escapeHtml(TEMPLATE_CATEGORIES[template.category] || template.category)}</span>
       </div>
       <div class="template-detail-row">
         <span class="info-label">Subject</span>
