@@ -40,7 +40,7 @@ Converted the mock SPA into a working international lead discovery and managemen
 
 ---
 
-**What's NOT built (Phase 3):** Email campaigns, LinkedIn/Twitter integration, settings persistence, export, real email tracking.
+**What's NOT built (as of Phases 3-4):** LinkedIn and Twitter/X API integration (deferred — see Phase 3 notes).
 
 ---
 
@@ -243,10 +243,65 @@ d83ffa5 fix: 7 bugs — falsy-zero coords, city ignored, breakdown bars, null
 
 ---
 
-## Phase 3 — Planned (Not Started)
+## Phase 3 — Email Outreach & Analytics (Complete)
 
-- Email sending and campaign automation
-- LinkedIn/Twitter integration
-- Settings backend persistence
-- Export functionality
-- Real email open/reply tracking
+Took the lead engine from an intelligence platform into a working outreach system. Added real email sending, tracking, campaigns, notifications, and persistent settings.
+
+### What Was Built
+
+- **Email accounts** — Connect Gmail via OAuth (`services/email/gmail-provider.js`) or custom SMTP (`services/email/smtp-provider.js` via nodemailer); stored in `email_accounts` table
+- **Email sending** — Single-email "Send Email" modal on the dashboard + full campaign sending; `services/email/email-service.js`
+- **Email tracking** — Real open tracking (tracking pixel) and click tracking (URL redirect) via `routes/tracking.js`; outgoing links are regex-wrapped with tracking URLs
+- **Replies** — Gmail reply sync (`syncReplies`), sentiment auto-detection, notifications bell, Replies Sent tab
+- **Campaigns** — Full CRUD, 4-step campaign wizard, lead assignment, sending, per-campaign tracking (`services/campaign/campaign-service.js`, `routes/campaigns.js`)
+- **Analytics dashboard** — Campaign metrics, open/click/reply/bounce rates, per-day timelines, per-campaign breakdown
+- **Settings persistence** — `routes/settings.js` persists to the SQLite `settings` table (GET/PUT)
+- **Export** — Functional CSV export moved to Phase 4 (see below); every export button now triggers a real download
+- **UI** — Notifications bell, responsive drawer sidebar, 4-step campaign wizard (v2.5.2)
+
+### Notes / Deferred
+- **LinkedIn integration** — NOT built. LinkedIn appears only as (a) Tavily-extracted company URLs in `companies.socialProfiles.linkedin`, (b) personal profile URLs on `contacts.linkedinUrl` (shown in Decision-Makers UI), and (c) a static "Connect" button in Settings.
+- **Twitter/X integration** — NOT built. Twitter presence is only detected as a binary "Active on social media" enrichment signal; the URL is not extracted or stored.
+
+### Commits
+```
+2a6593b v2.4.0: Gmail email integration + fix UI.el hash-prefix bug
+7067f3b feat: add SMTP email provider + dashboard Send Email modal
+158fd62 v2.5.2: notifications bell + 4-step campaign wizard + Replies Sent tab + responsive drawer sidebar
+21c788e Phase 3: Email tracking, analytics dashboard, reply sync guard
+11605e9 Fix security bugs: XSS, open redirect, tracking gaps
+```
+
+---
+
+## Phase 4 — Deals, Tasks, Templates, Engagement Scoring (Complete)
+
+Extended the platform from email outreach into full pipeline management and CRM-style automation.
+
+### What Was Built
+
+- **Deals pipeline** — `routes/deals.js` + `js/views/deals.js`; Kanban board with 6 stages (Lead → Qualified → Proposal → Negotiation → Won → Lost), deal metrics (total deals, won value, pipeline value, win rate, per-stage breakdown), create/edit/delete, link to leads, auto-probability/close-date on stage change, activity logging
+- **Tasks** — `routes/tasks.js` + `js/views/tasks.js`; types (follow_up, call, meeting, email, note), stats (total/overdue/pending/completed), today tasks, complete/uncomplete, overdue filtering, activity logging
+- **Email templates** — `routes/templates.js` + `js/views/templates.js`; template CRUD with subject/body/category/placeholders, `usageCount` tracking
+- **Auto-sentiment** — `detectSentiment()` in `email-service.js`; keyword-based positive/negative/neutral detection on replies; used in reply sync and notifications
+- **Engagement scoring** — Campaign analytics with open/click/reply rates and positive-reply tracking; activity tracking for email_sent, opened, clicked, reply_received, deal_created, deal_stage_changed, task_created, task_completed
+- **Export** — `routes/export.js` delivering CSV downloads for leads, deals, tasks, campaigns, and a multi-section analytics report (with UTF-8 BOM for Excel and proper escaping)
+
+### Database Additions
+- New tables: `deals`, `tasks`, `email_templates`
+- `campaigns` / `email_accounts` expanded with SMTP fields
+- Total now 21 tables (up from 12 at end of Phase 2) — see `db/schema.js`
+
+### Commits
+```
+c786a27 Phase 4: Deals pipeline, tasks, email templates, auto-sentiment, engagement scoring
+5b7cf15 Fix 4 bugs: deal update crash, XSS, sentiment false positives, template data loss
+```
+
+---
+
+## Phase 5 — Planned / Candidates
+
+- LinkedIn / Twitter / X API integration (deferred from Phase 3)
+- Additional social media data harvesting and display
+- Further campaign automation and scheduling enhancements

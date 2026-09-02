@@ -34,13 +34,23 @@ router.get('/analytics/overview', (req, res) => {
 
     const perCampaign = db.prepare(`
       SELECT
-        c.id, c.name, c.status, c.sent, c.opened, c.clicked, c.replied, c.bounced, c.createdAt,
+        c.id, c.name, c.status, c.sent, c.opened, c.clicked, c.replied, c.bounced, c.createdAt, c.trackingJson,
         CASE WHEN c.sent > 0 THEN ROUND(c.opened * 100.0 / c.sent, 1) ELSE 0 END as openRate,
         CASE WHEN c.sent > 0 THEN ROUND(c.clicked * 100.0 / c.sent, 1) ELSE 0 END as clickRate
       FROM campaigns c
       WHERE c.sent > 0
       ORDER BY c.createdAt DESC
     `).all();
+
+    const withFlags = perCampaign.map(c => {
+      let t = {};
+      try { t = JSON.parse(c.trackingJson || '{}'); } catch (_) {}
+      return {
+        ...c,
+        openTrackingOn: t.openTracking !== undefined ? !!t.openTracking : true,
+        clickTrackingOn: t.clickTracking !== undefined ? !!t.clickTracking : true,
+      };
+    });
 
     const dailySends = db.prepare(`
       SELECT date(sentAt) as day, COUNT(*) as sent
@@ -67,7 +77,7 @@ router.get('/analytics/overview', (req, res) => {
       overallOpenRate: totals.totalSends ? Math.min((totals.totalOpened / totals.totalSends) * 100, 100).toFixed(1) : '0.0',
       overallClickRate: totals.totalSends ? Math.min((totals.totalClicked / totals.totalSends) * 100, 100).toFixed(1) : '0.0',
       overallReplyRate: totals.totalSends ? Math.min((replyCount / totals.totalSends) * 100, 100).toFixed(1) : '0.0',
-      perCampaign,
+      perCampaign: withFlags,
       dailySends: dailySends.reverse(),
       dailyOpens: dailyOpens.reverse(),
       dailyClicks: dailyClicks.reverse(),
@@ -167,6 +177,53 @@ router.post('/:id/send', async (req, res) => {
   }
 });
 
+// Enqueue + process the campaign queue (continue sending previously queued rows).
+router.post('/:id/process', async (req, res) => {
+  try {
+    const { delayMinSec, delayMaxSec } = req.body || {};
+    const result = await campaignService.processCampaignQueue(req.params.id, { delayMinSec, delayMaxSec });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Queue status (for UI: sent/failed/skipped/blocked/queued, plus cap reason).
+router.get('/:id/queue', (req, res) => {
+  try {
+    const campaign = campaignService.getCampaign(req.params.id);
+    if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+    const rows = campaignService.getCampaignQueue(req.params.id);
+    const stats = {
+      queued: rows.filter(r => r.status === 'queued').length,
+      processing: rows.filter(r => r.status === 'processing').length,
+      sent: rows.filter(r => r.status === 'sent').length,
+      failed: rows.filter(r => r.status === 'failed').length,
+      skipped: rows.filter(r => r.status === 'skipped').length,
+      blocked: rows.filter(r => r.status === 'blocked').length,
+    };
+    res.json({ stats, rows, deliverability: campaign.deliverability, tracking: campaign.tracking });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Personalization preview for a single recipient.
+router.post('/:id/preview', (req, res) => {
+  try {
+    const campaign = campaignService.getCampaign(req.params.id);
+    if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+    const lead = req.body ? (req.body.lead || req.body) : null;
+    if (!lead || (!lead.id && !lead.leadId)) {
+      return res.status(400).json({ error: 'A lead id is required for preview' });
+    }
+    res.json(campaignService.previewForLead(campaign, lead));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // Email tracking analytics — per-campaign breakdown
 router.get('/:id/tracking', (req, res) => {
   try {
@@ -174,6 +231,11 @@ router.get('/:id/tracking', (req, res) => {
     const campaignId = req.params.id;
     const campaign = db.prepare('SELECT * FROM campaigns WHERE id = ?').get(campaignId);
     if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+
+    let trackCfg = {};
+    try { trackCfg = JSON.parse(campaign.trackingJson || '{}'); } catch (_) {}
+    const openTrackingOn = trackCfg.openTracking !== undefined ? !!trackCfg.openTracking : true;
+    const clickTrackingOn = trackCfg.clickTracking !== undefined ? !!trackCfg.clickTracking : true;
 
     const sends = db.prepare('SELECT COUNT(*) as c FROM email_sends WHERE campaignId = ?').get(campaignId).c;
     const opened = db.prepare('SELECT COUNT(*) as c FROM email_sends WHERE campaignId = ? AND openedAt IS NOT NULL').get(campaignId).c;
@@ -207,10 +269,12 @@ router.get('/:id/tracking', (req, res) => {
       bounced,
       replied,
       failed,
-      openRate: sends ? ((opened / sends) * 100).toFixed(1) : '0.0',
-      clickRate: sends ? ((clicked / sends) * 100).toFixed(1) : '0.0',
+      openRate: sends && openTrackingOn ? ((opened / sends) * 100).toFixed(1) : null,
+      clickRate: sends && clickTrackingOn ? ((clicked / sends) * 100).toFixed(1) : null,
       replyRate: sends ? ((replied / sends) * 100).toFixed(1) : '0.0',
       bounceRate: sends ? ((bounced / sends) * 100).toFixed(1) : '0.0',
+      openTrackingOn,
+      clickTrackingOn,
       timeline,
       openTimeline,
       clickTimeline,

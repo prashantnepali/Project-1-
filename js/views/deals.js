@@ -19,9 +19,9 @@ async function renderDeals() {
   }
 
   const formatCurrency = (v) => {
-    if (v >= 1000000) return '$' + (v / 1000000).toFixed(1) + 'M';
-    if (v >= 1000) return '$' + (v / 1000).toFixed(1) + 'K';
-    return '$' + (v || 0).toFixed(0);
+    if (v >= 1000000) return 'Rs ' + (v / 1000000).toFixed(1) + 'M';
+    if (v >= 1000) return 'Rs ' + (v / 1000).toFixed(1) + 'K';
+    return 'Rs ' + (v || 0).toFixed(0);
   };
 
   const html = `
@@ -31,6 +31,7 @@ async function renderDeals() {
         <p class="page-sub">${metrics.totalDeals} deals · ${formatCurrency(metrics.pipelineValue)} pipeline</p>
       </div>
       <div class="page-actions">
+        <button class="btn btn-secondary" data-action="export-deals">${icon('download')} Export</button>
         <button class="btn btn-primary" data-action="add-deal">${icon('plus')} New Deal</button>
       </div>
     </div>
@@ -81,6 +82,15 @@ async function renderDeals() {
 
 function bindDealsEvents() {
   UI.delegate('#view', '[data-action="add-deal"]', 'click', () => showDealModal());
+
+  UI.delegate('#view', '[data-action="export-deals"]', 'click', async () => {
+    try {
+      await API.export.deals();
+      UI.toast('Deals exported.');
+    } catch (err) {
+      UI.toast('Export failed: ' + err.message, 'error');
+    }
+  });
 
   UI.delegate('#view', '[data-deal-edit]', 'click', async (e, el) => {
     e.stopPropagation();
@@ -202,7 +212,7 @@ async function showDealModal(deal = null) {
 }
 
 function showDealDetail(deal) {
-  const formatCurrency = (v) => '$' + (v || 0).toLocaleString();
+  const formatCurrency = (v) => 'Rs ' + (v || 0).toLocaleString();
 
   const body = `
     <div class="deal-detail">

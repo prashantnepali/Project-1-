@@ -207,7 +207,34 @@ function initSchema() {
       completedAt TEXT,
       createdAt TEXT DEFAULT (datetime('now')),
       updatedAt TEXT DEFAULT (datetime('now')),
+      trackingJson TEXT DEFAULT '{}',
+      deliverabilityJson TEXT DEFAULT '{}',
       FOREIGN KEY (accountId) REFERENCES email_accounts(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS suppressions (
+      email TEXT PRIMARY KEY,
+      reason TEXT NOT NULL,
+      source TEXT,
+      campaignId TEXT,
+      createdAt TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (campaignId) REFERENCES campaigns(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS campaign_queue (
+      id TEXT PRIMARY KEY,
+      campaignId TEXT NOT NULL,
+      leadId TEXT NOT NULL,
+      accountId TEXT,
+      stepOrder INTEGER DEFAULT 1,
+      status TEXT DEFAULT 'queued',
+      error TEXT,
+      attemptCount INTEGER DEFAULT 0,
+      processedAt TEXT,
+      createdAt TEXT DEFAULT (datetime('now')),
+      UNIQUE (campaignId, leadId, stepOrder),
+      FOREIGN KEY (campaignId) REFERENCES campaigns(id) ON DELETE CASCADE,
+      FOREIGN KEY (leadId) REFERENCES leads(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS campaign_leads (
@@ -363,6 +390,10 @@ function initSchema() {
     CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(dueDate);
     CREATE INDEX IF NOT EXISTS idx_tasks_completed ON tasks(completedAt);
     CREATE INDEX IF NOT EXISTS idx_email_templates_category ON email_templates(category);
+    CREATE INDEX IF NOT EXISTS idx_suppressions_email ON suppressions(email);
+    CREATE INDEX IF NOT EXISTS idx_email_sends_sentAt ON email_sends(sentAt);
+    CREATE INDEX IF NOT EXISTS idx_campaign_queue_campaign ON campaign_queue(campaignId);
+    CREATE INDEX IF NOT EXISTS idx_campaign_queue_status ON campaign_queue(status);
 
     CREATE VIRTUAL TABLE IF NOT EXISTS leads_fts USING fts5(name, company, content='leads', content_rowid='rowid');
 
@@ -390,9 +421,15 @@ function initSchema() {
     'ALTER TABLE email_accounts ADD COLUMN smtpSecure TEXT',
     'ALTER TABLE email_accounts ADD COLUMN smtpUser TEXT',
     'ALTER TABLE email_accounts ADD COLUMN smtpPass TEXT',
+    'ALTER TABLE campaigns ADD COLUMN trackingJson TEXT DEFAULT "{}"',
+    'ALTER TABLE campaigns ADD COLUMN deliverabilityJson TEXT DEFAULT "{}"',
   ];
   for (const sql of migrations) {
-    try { db.exec(sql); } catch (_) {}
+    try { db.exec(sql); } catch (e) {
+      if (!e.message.includes('duplicate column name') && !e.message.includes('already exists')) {
+        console.warn(`[WARN] Migration failed: ${sql} — ${e.message}`);
+      }
+    }
   }
 
   const leadScoreCol = db.prepare("PRAGMA table_info(lead_scores)").all().find(c => c.name === 'companyId');

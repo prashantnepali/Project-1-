@@ -108,7 +108,7 @@ function bindTemplateEvents() {
 
 function showTemplateModal(template = null) {
   const isEdit = !!template;
-  const placeholders = ['{{firstName}}', '{{lastName}}', '{{company}}', '{{industry}}', '{{title}}', '{{name}}'];
+  const placeholders = ['{{firstName}}', '{{lastName}}', '{{company}}', '{{industry}}', '{{title}}', '{{name}}', '{{first_name}}', '{{company_name}}', '{{sender_name}}', '{{phone_number}}'];
 
   const body = `
     <form id="template-form" class="form-grid">
@@ -195,7 +195,7 @@ function showTemplateDetail(template) {
       </div>
       <div class="template-detail-row" style="flex-direction:column;gap:4px">
         <span class="info-label">Body Preview</span>
-        <div class="template-preview-box">${template.body || '<em>Empty</em>'}</div>
+        <div class="template-preview-box" style="white-space:pre-wrap">${escapeHtml(template.body || '') || '<em>Empty</em>'}</div>
       </div>
     </div>`;
 

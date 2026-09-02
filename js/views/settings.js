@@ -9,6 +9,11 @@ async function renderSettings() {
     // fallback to in-memory settings
   }
 
+  // Persist dark mode state
+  if (settings.darkMode) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+
   const html = `
     <div class="page-head">
       <div>
@@ -25,16 +30,20 @@ async function renderSettings() {
           </div>
           <div class="card-body">
             <div class="settings-form">
-              <div class="form-row">
-                <div class="form-group">
-                  <label>Full Name</label>
-                  <input type="text" value="${escapeHtml(settings.profileName || 'Prashant Kumar')}" id="s-name">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" value="${escapeHtml(settings.profileName || 'Prashant')}" id="s-name">
+                  </div>
+                  <div class="form-group">
+                    <label>Contact Phone</label>
+                    <input type="tel" value="${escapeHtml(settings.contactPhone || '')}" id="s-phone" placeholder="+1 555 000 0000">
+                  </div>
                 </div>
                 <div class="form-group">
                   <label>Email</label>
                   <input type="email" value="${escapeHtml(settings.profileEmail || 'prashant@samparka.io')}" id="s-email">
                 </div>
-              </div>
               <div class="form-group">
                 <label>Role</label>
                 <input type="text" value="Admin" readonly style="background:var(--surface-2)">
@@ -97,7 +106,7 @@ async function renderSettings() {
               <div class="toggle-row">
                 <div>
                   <div class="toggle-label">Dark Mode</div>
-                  <div class="toggle-desc">Switch to dark theme (coming soon)</div>
+                  <div class="toggle-desc">Switch between light and dark theme</div>
                 </div>
                 <label class="toggle">
                   <input type="checkbox" id="s-darkmode" ${settings.darkMode ? 'checked' : ''}>
@@ -185,12 +194,14 @@ function bindSettingsEvents() {
   UI.on('#save-profile', async () => {
     const name = document.getElementById('s-name').value.trim();
     const email = document.getElementById('s-email').value.trim();
+    const phone = document.getElementById('s-phone').value.trim();
     if (!name || !email) return UI.toast('Name and email are required.', 'error');
     const settings = Store.get('settings');
     settings.profileName = name;
     settings.profileEmail = email;
+    settings.contactPhone = phone;
     Store.set('settings', settings);
-    try { await API.settings.update({ profileName: name, profileEmail: email }); } catch (e) {}
+    try { await API.settings.update({ profileName: name, profileEmail: email, contactPhone: phone }); } catch (e) {}
     UI.toast('Profile saved successfully.');
   });
 
@@ -222,6 +233,7 @@ function bindSettingsEvents() {
     }
     if (id === 's-darkmode') {
       document.documentElement.setAttribute('data-theme', e.target.checked ? 'dark' : '');
+      localStorage.setItem('samparka-theme', e.target.checked ? 'dark' : 'light');
     }
     UI.toast('Preference updated.');
   });
@@ -234,7 +246,7 @@ function bindSettingsEvents() {
   UI.delegate('#view', '[data-action="delete-all"]', 'click', async () => {
     if (confirm('Are you sure you want to delete all data? This cannot be undone.')) {
       try {
-        await API.del('/data');
+        await API.del('/data', { confirm: 'DELETE_ALL' });
         Store._state.leads = [];
         Store._state.activities = [];
         UI.toast('All data has been deleted.');

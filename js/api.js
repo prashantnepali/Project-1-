@@ -38,13 +38,42 @@ const API = {
     return res.json();
   },
 
-  async del(path) {
-    const res = await fetch(`${API_BASE}/api${path}`, { method: 'DELETE' });
+  async del(path, body) {
+    const opts = { method: 'DELETE' };
+    if (body) {
+      opts.headers = { 'Content-Type': 'application/json' };
+      opts.body = JSON.stringify(body);
+    }
+    const res = await fetch(`${API_BASE}/api${path}`, opts);
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: res.statusText }));
       throw new Error(err.error || 'API request failed');
     }
     return res.json();
+  },
+
+  async download(path) {
+    const res = await fetch(`${API_BASE}/api${path}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || 'Download failed');
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') || '';
+    const match = disposition.match(/filename="?([^";]+)"?/);
+    const filename = match ? decodeURIComponent(match[1]) : 'download.csv';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
+
+  dashboard: {
+    overview: () => API.get('/dashboard/overview'),
   },
 
   discover: {
@@ -108,6 +137,9 @@ const API = {
     getLeads: (id) => API.get(`/campaigns/${id}/leads`),
     removeLead: (id, leadId) => API.del(`/campaigns/${id}/leads/${leadId}`),
     send: (id) => API.post(`/campaigns/${id}/send`),
+    process: (id, delay) => API.post(`/campaigns/${id}/process`, delay || {}),
+    queue: (id) => API.get(`/campaigns/${id}/queue`),
+    preview: (id, lead) => API.post(`/campaigns/${id}/preview`, { lead }),
     tracking: (id) => API.get(`/campaigns/${id}/tracking`),
     analyticsOverview: () => API.get('/campaigns/analytics/overview'),
   },
@@ -118,6 +150,7 @@ const API = {
       const q = new URLSearchParams(params || {}).toString();
       return API.get(`/emails/sends${q ? '?' + q : ''}`);
     },
+    bounce: (sendId) => API.post(`/emails/sends/${sendId}/bounce`),
     replies: (params) => {
       const q = new URLSearchParams(params || {}).toString();
       return API.get(`/emails/replies${q ? '?' + q : ''}`);
@@ -166,5 +199,24 @@ const API = {
     update: (id, data) => API.put(`/templates/${id}`, data),
     delete: (id) => API.del(`/templates/${id}`),
     use: (id) => API.post(`/templates/${id}/use`),
+  },
+
+  export: {
+    leads: () => API.download('/export/leads'),
+    deals: () => API.download('/export/deals'),
+    tasks: () => API.download('/export/tasks'),
+    campaigns: () => API.download('/export/campaigns'),
+    analytics: () => API.download('/export/analytics'),
+    leadEmails: (id) => API.download(`/export/leads/${id}/emails`),
+  },
+
+  suppressions: {
+    list: (params) => {
+      const q = new URLSearchParams(params || {}).toString();
+      return API.get(`/suppressions${q ? '?' + q : ''}`);
+    },
+    add: (data) => API.post('/suppressions', data),
+    remove: (email) => API.del(`/suppressions/${encodeURIComponent(email)}`),
+    check: (email) => API.get(`/suppressions/check?email=${encodeURIComponent(email)}`),
   },
 };

@@ -13,13 +13,12 @@ const ALLOWED_FIELDS = ['type', 'title', 'description', 'dueDate', 'priority', '
 router.get('/stats', (req, res) => {
   try {
     const db = getDb();
-    const now = new Date().toISOString();
 
     const stats = db.prepare(`
       SELECT
         COUNT(*) as total,
-        COUNT(CASE WHEN completedAt IS NULL AND dueDate < '${now}' THEN 1 END) as overdue,
-        COUNT(CASE WHEN completedAt IS NULL AND dueDate >= '${now}' THEN 1 END) as pending,
+        COUNT(CASE WHEN completedAt IS NULL AND dueDate < datetime('now') THEN 1 END) as overdue,
+        COUNT(CASE WHEN completedAt IS NULL AND dueDate >= datetime('now') THEN 1 END) as pending,
         COUNT(CASE WHEN completedAt IS NOT NULL THEN 1 END) as completed
       FROM tasks
     `).get();

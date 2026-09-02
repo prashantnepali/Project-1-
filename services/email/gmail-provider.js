@@ -79,7 +79,11 @@ async function handleCallback(code) {
   return { id, email, displayName, status: 'connected' };
 }
 
+const _authClients = new Map();
+
 function getAuthForAccount(account) {
+  if (_authClients.has(account.id)) return _authClients.get(account.id);
+
   const oauth2Client = getOAuth2Client();
   oauth2Client.setCredentials({
     access_token: account.accessToken,
@@ -96,6 +100,7 @@ function getAuthForAccount(account) {
     }
   });
 
+  _authClients.set(account.id, oauth2Client);
   return oauth2Client;
 }
 
@@ -112,7 +117,6 @@ async function sendEmail(account, { to, subject, text, html, inReplyTo, referenc
   if (references) parts.push(`References: ${references}`);
 
   if (html) {
-    parts.push('MIME-Version: 1.0');
     parts.push('Content-Type: text/html; charset="UTF-8"');
     parts.push('');
     parts.push(html);

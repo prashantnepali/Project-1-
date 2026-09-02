@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getDb } = require('../db/connection');
+const { invalidateSettingsCache } = require('../services/email/email-service');
 
 router.get('/', (req, res) => {
   try {
@@ -26,6 +27,7 @@ router.put('/', (req, res) => {
       }
     });
     updateMany(Object.entries(req.body));
+    invalidateSettingsCache();
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

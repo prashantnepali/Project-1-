@@ -82,9 +82,25 @@ function syncSidebarForWidth() {
 
 document.addEventListener('DOMContentLoaded', () => {
   Store.init();
-  if (Store.get('settings').darkMode) {
-    document.documentElement.setAttribute('data-theme', 'dark');
-  }
+
+  const applyTheme = (darkMode) => {
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : '');
+  };
+
+  // Apply theme from the locally-persisted preference immediately (no flash),
+  // then reconcile with the server-stored settings.
+  const localDark = localStorage.getItem('samparka-theme');
+  applyTheme(localDark === 'dark' || (!localDark && Store.get('settings').darkMode));
+
+  // Load server settings (source of truth for dark mode) and apply theme.
+  API.settings.get()
+    .then(serverSettings => {
+      const merged = { ...Store.get('settings'), ...serverSettings };
+      Store.set('settings', merged);
+      applyTheme(!!merged.darkMode);
+      localStorage.setItem('samparka-theme', merged.darkMode ? 'dark' : 'light');
+    })
+    .catch(() => {});
 
   UI.buildSidebar();
   UI.buildTopbar();

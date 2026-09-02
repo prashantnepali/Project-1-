@@ -75,11 +75,14 @@ router.get('/click/:sendId', (req, res) => {
     const sendId = req.params.sendId;
     let url = req.query.url || '/';
     // Prevent open redirect to dangerous schemes
-    if (/^\s*(javascript|data|vbscript):/i.test(url)) url = '/';
+    if (/^\s*(javascript|data|vbscript|file|ftp|blob):/i.test(url)) url = '/';
+    // Also block protocol-relative URLs and non-http(s) schemes
+    if (/^\/\//.test(url) && !url.startsWith('//')) url = '/';
+    if (!/^https?:\/\//i.test(url) && url !== '/') url = '/';
 
     const send = db.prepare('SELECT * FROM email_sends WHERE id = ?').get(sendId);
     if (!send) {
-      return res.redirect(url);
+      return res.redirect('/');
     }
 
     const now = new Date().toISOString();
@@ -108,7 +111,7 @@ router.get('/click/:sendId', (req, res) => {
     res.redirect(url);
   } catch (err) {
     console.error('Click tracking error:', err);
-    res.redirect(req.query.url || '/');
+    res.redirect('/');
   }
 });
 

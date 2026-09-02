@@ -28,6 +28,7 @@ async function renderCampaigns() {
         <p class="page-sub">${_campaigns.length} campaigns in your account</p>
       </div>
       <div class="page-actions">
+        <button class="btn btn-secondary" data-action="export-campaigns">${icon('download')} Export</button>
         <button class="btn btn-primary" data-action="new-campaign">${icon('plus')} New Campaign</button>
       </div>
     </div>
@@ -83,8 +84,8 @@ function campaignRows(campaigns) {
   }
 
   return campaigns.map(c => {
-    const openRate = c.sent ? Math.round((c.opened / c.sent) * 100) : 0;
-    const replyRate = c.sent ? Math.round((c.replied / c.sent) * 100) : 0;
+    const openRate = c.sent ? Math.round(((c.opened || 0) / c.sent) * 100) : 0;
+    const replyRate = c.sent ? Math.round(((c.replied || 0) / c.sent) * 100) : 0;
 
     return `
     <tr class="row-click" data-campaign="${c.id}">
@@ -182,6 +183,15 @@ function bindCampaignEvents() {
     showNewCampaignModal();
   });
 
+  UI.delegate('#view', '[data-action="export-campaigns"]', 'click', async () => {
+    try {
+      await API.export.campaigns();
+      UI.toast('Campaigns exported.');
+    } catch (err) {
+      UI.toast('Export failed: ' + err.message, 'error');
+    }
+  });
+
   UI.delegate('#view', '[data-campaign-edit]', 'click', async (e, el) => {
     e.stopPropagation();
     try {
@@ -194,9 +204,9 @@ function bindCampaignEvents() {
 }
 
 async function showCampaignDetail(c) {
-  const openRate = c.sent ? Math.round((c.opened / c.sent) * 100) : 0;
-  const clickRate = c.opened ? Math.round((c.clicked / c.opened) * 100) : 0;
-  const replyRate = c.sent ? Math.round((c.replied / c.sent) * 100) : 0;
+  const openRate = c.sent ? Math.round(((c.opened || 0) / c.sent) * 100) : 0;
+  const clickRate = c.sent ? Math.round(((c.clicked || 0) / c.sent) * 100) : 0;
+  const replyRate = c.sent ? Math.round(((c.replied || 0) / c.sent) * 100) : 0;
   const replyCount = c.replyCount || 0;
 
   let campaignLeads = [];
@@ -232,6 +242,7 @@ async function showCampaignDetail(c) {
                 <td>${cl.sentAt ? UI.formatDate(cl.sentAt) : '—'}</td>
                 <td>
                   <div class="td-actions">
+                    <button class="ibtn" data-campaign-preview="${c.id}" data-lead-id="${cl.leadId}" title="Preview" style="color:var(--brand)">${icon('eye')}</button>
                     <button class="ibtn ibtn-r" data-campaign-remove-lead="${c.id}" data-lead-id="${cl.leadId}" title="Remove">${icon('trash', 'ic-14')}</button>
                   </div>
                 </td>
@@ -256,9 +267,18 @@ async function showCampaignDetail(c) {
       <div>${campaignBadge(c.status)}</div>
       <div class="muted small">Created ${UI.formatDate(c.createdAt)}</div>
     </div>
+    <div class="spread" style="margin-bottom:16px">
+      <div class="muted small">${icon('send', 'ic-14')} Campaign: ${escapeHtml(c.name)}</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm btn-secondary" data-campaign-detail-edit="${c.id}">${icon('edit')} Edit</button>
+        <button class="btn btn-sm btn-primary" data-campaign-detail-send="${c.id}">${icon('send')} Send / Process</button>
+      </div>
+    </div>
     <div class="metrics" style="grid-template-columns:repeat(4,1fr)">
       ${metricCard('send', 'i-blue', c.sent, 'Sent')}
-      ${metricCard('eye', 'i-indigo', c.opened, 'Opened')}
+      ${c.openTrackingOn === false
+        ? `<div class="metric"><div class="metric-ic i-indigo">${icon('eye')}</div><div class="metric-num">Open tracking<br>disabled</div></div>`
+        : metricCard('eye', 'i-indigo', c.opened, 'Opened')}
       ${metricCard('messageSquare', 'i-green', replyCount, 'Replied')}
       ${metricCard('alertCircle', 'i-red', c.bounced, 'Bounced')}
     </div>
@@ -267,11 +287,17 @@ async function showCampaignDetail(c) {
       <div class="funnel">
         <div class="fn-row"><div class="fn-label">Sent</div><div class="fn-track"><div class="fn-bar" style="width:100%"></div></div><div class="fn-val">${c.sent}</div></div>
         <div class="fn-row"><div class="fn-label">Delivered</div><div class="fn-track"><div class="fn-bar" style="width:${c.sent ? (c.delivered/c.sent)*100 : 0}%"></div></div><div class="fn-val">${c.delivered}</div></div>
-        <div class="fn-row"><div class="fn-label">Opened</div><div class="fn-track"><div class="fn-bar" style="width:${openRate}%"></div></div><div class="fn-val">${c.opened}</div><div class="fn-conv">${openRate}%</div></div>
-        <div class="fn-row"><div class="fn-label">Clicked</div><div class="fn-track"><div class="fn-bar" style="width:${clickRate}%"></div></div><div class="fn-val">${c.clicked}</div><div class="fn-conv">${clickRate}%</div></div>
+        ${c.openTrackingOn === false
+          ? `<div class="fn-row"><div class="fn-label">Opened</div><div class="fn-track"><div class="fn-bar" style="width:0%"></div></div><div class="fn-val">tracking off</div></div>`
+          : `<div class="fn-row"><div class="fn-label">Opened</div><div class="fn-track"><div class="fn-bar" style="width:${openRate}%"></div></div><div class="fn-val">${c.opened}</div><div class="fn-conv">${openRate}%</div></div>`}
+        ${c.clickTrackingOn === false
+          ? `<div class="fn-row"><div class="fn-label">Clicked</div><div class="fn-track"><div class="fn-bar" style="width:0%"></div></div><div class="fn-val">tracking off</div></div>`
+          : `<div class="fn-row"><div class="fn-label">Clicked</div><div class="fn-track"><div class="fn-bar" style="width:${clickRate}%"></div></div><div class="fn-val">${c.clicked}</div><div class="fn-conv">${clickRate}%</div></div>`}
         <div class="fn-row"><div class="fn-label">Replied</div><div class="fn-track"><div class="fn-bar" style="width:${replyRate}%"></div></div><div class="fn-val">${replyCount}</div><div class="fn-conv">${replyRate}%</div></div>
       </div>
     </div>
+    <div class="mt24" id="campaign-deliverability-summary">${renderDeliverabilitySummary(c)}</div>
+    <div class="mt24" id="campaign-queue-status"></div>
     <div class="mt24">
       <h4 style="margin-bottom:8px">Subject Line</h4>
       <p style="font-size:13px;color:var(--text-2)">${escapeHtml(c.subject)}</p>
@@ -301,8 +327,69 @@ async function showCampaignDetail(c) {
 }
 
 function campaignLeadBadge(status) {
-  const colors = { pending: 'st-new', sent: 'st-sent', replied: 'st-res', failed: 'st-dnc' };
+  const colors = { pending: 'st-new', sent: 'st-sent', replied: 'st-res', failed: 'st-dnc', skipped: 'st-arch', bounced: 'st-dnc', blocked: 'st-dnc' };
   return `<span class="badge ${colors[status] || 'st-new'}">${status}</span>`;
+}
+
+function renderDeliverabilitySummary(c) {
+  const tr = c.tracking || {};
+  const dv = c.deliverability || {};
+  const row = (label, val, on) =>
+    `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--line)"><span class="muted small">${label}</span><span class="small" style="font-weight:500">${val} <span style="color:${on ? 'var(--green, #22c55e)' : 'var(--text-3)'}">${on ? 'ON' : 'OFF'}</span></span></div>`;
+  return `
+    <h4 style="margin-bottom:12px">${icon('shield', 'ic-14')} Deliverability</h4>
+    <div style="background:var(--bg-2);border-radius:8px;padding:8px 14px;font-size:12.5px">
+      ${row('Open Tracking', '1px pixel', tr.openTracking !== false)}
+      ${row('Click Tracking', 'link redirect', tr.clickTracking !== false)}
+      ${row('Conservative Mode', 'sequential + delay', dv.conservativeMode !== false)}
+      ${row('Stop on Reply', '', dv.stopOnReply !== false)}
+      ${row('Stop on Bounce', '', dv.stopOnBounce !== false)}
+      ${row('Stop on Unsubscribe', '', dv.stopOnUnsubscribe !== false)}
+      ${row('Daily Send Limit', `${dv.dailySendLimit != null ? dv.dailySendLimit : 40} / day`, true)}
+      ${row('Delay range', `${dv.delayMinSec != null ? dv.delayMinSec : 90}–${dv.delayMaxSec != null ? dv.delayMaxSec : 180}s`, dv.conservativeMode !== false)}
+      ${row('Optional Footer', dv.footerText ? 'enabled' : 'none', !!dv.footerText)}
+    </div>`;
+}
+
+async function loadCampaignQueueStatus(campaignId) {
+  const el = document.getElementById('campaign-queue-status');
+  if (!el) return;
+  try {
+    const q = await API.campaigns.queue(campaignId);
+    const s = q.stats || {};
+    const cap = (q.deliverability && q.deliverability.dailySendLimit) || 40;
+    const parts = [`Queued ${s.queued || 0}`, `Sent ${s.sent || 0}`, `Failed ${s.failed || 0}`, `Skipped ${s.skipped || 0}`, `Blocked ${s.blocked || 0}`];
+    el.innerHTML = `
+      <h4 style="margin-bottom:8px">Queue Status <span class="muted small">(daily cap ${cap}/day)</span></h4>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;background:var(--bg-2);padding:10px 14px;border-radius:8px">
+        ${parts.map(p => `<span>${p}</span>`).join('')}
+      </div>
+      ${s.queued ? `<div class="muted small" style="margin-top:8px">${s.queued} message(s) still queued. Click "Send / Process" to continue (respects the daily cap and delay).</div>` : ''}`;
+  } catch (e) {
+    el.innerHTML = '';
+  }
+}
+
+async function showCampaignPreview(campaignId, leadId) {
+  try {
+    const prev = await API.campaigns.preview(campaignId, { id: leadId });
+    const card = (label, val) => `<div class="form-group"><label>${label}</label><div style="font-size:12.5px;background:var(--bg-2);padding:8px 12px;border-radius:6px;white-space:pre-wrap;word-break:break-word">${escapeHtml(val ?? '—')}</div></div>`;
+    const unresolved = (prev.unresolved || []).length
+      ? `<div class="form-group"><label>Unresolved template variables</label><div style="color:var(--danger,#ef4444);font-size:12.5px">${prev.unresolved.map(u => escapeHtml(u)).join(', ') || 'none'}</div></div>`
+      : '';
+    const tracking = `<div class="form-group"><label>Tracking</label><div style="font-size:12.5px">Open: ${prev.tracking && prev.tracking.openTracking ? 'ON' : 'OFF'} &nbsp; Click: ${prev.tracking && prev.tracking.clickTracking ? 'ON' : 'OFF'}</div></div>`;
+    const html = `
+      ${card('From', prev.from)}
+      ${card('To', prev.to)}
+      ${card('Subject', prev.subject)}
+      ${card('Body', prev.body)}
+      ${tracking}
+      ${unresolved}
+    `;
+    UI.modal('Personalization Preview', html, { wide: true });
+  } catch (err) {
+    UI.toast('Preview failed: ' + err.message);
+  }
 }
 
 async function showAddLeadsModal(campaignId) {
@@ -355,8 +442,8 @@ async function showAddLeadsModal(campaignId) {
   });
 }
 
-const CAMPAIGN_STEPS = ['Details', 'Audience', 'Sender', 'Email'];
-const CAMPAIGN_PLACEHOLDERS = ['{{firstName}}', '{{lastName}}', '{{company}}', '{{industry}}', '{{title}}'];
+const CAMPAIGN_STEPS = ['Details', 'Audience', 'Sender', 'Email', 'Deliverability'];
+const CAMPAIGN_PLACEHOLDERS = ['{{firstName}}', '{{lastName}}', '{{company}}', '{{industry}}', '{{title}}', '{{first_name}}', '{{company_name}}', '{{sender_name}}', '{{phone_number}}'];
 
 async function showNewCampaignModal() {
   let accounts = [];
@@ -386,6 +473,8 @@ async function showNewCampaignModal() {
     subject: '',
     body: '',
     accountId: '',
+    tracking: { openTracking: false, clickTracking: false },
+    deliverability: { conservativeMode: true, stopOnReply: true, stopOnBounce: true, stopOnUnsubscribe: true, dailySendLimit: 40, delayMinSec: 90, delayMaxSec: 180, footerText: '' },
   };
 
   const placeholders = CAMPAIGN_PLACEHOLDERS;
@@ -438,6 +527,20 @@ async function showNewCampaignModal() {
       state.subject = getVal('subject');
       state.body = modal.querySelector('textarea[name="body"]')?.value?.trim() || '';
     }
+    if (state.step === 5) {
+      const cb = (n) => modal.querySelector(`input[name="${n}"]`)?.checked === true;
+      state.tracking = { openTracking: cb('openTracking'), clickTracking: cb('clickTracking') };
+      state.deliverability = {
+        conservativeMode: cb('conservativeMode'),
+        stopOnReply: cb('stopOnReply'),
+        stopOnBounce: cb('stopOnBounce'),
+        stopOnUnsubscribe: cb('stopOnUnsubscribe'),
+        dailySendLimit: parseInt(getVal('dailySendLimit'), 10) || 40,
+        delayMinSec: parseInt(getVal('delayMinSec'), 10) || 90,
+        delayMaxSec: parseInt(getVal('delayMaxSec'), 10) || 180,
+        footerText: getVal('footerText'),
+      };
+    }
   }
 
   function updateSteps() {
@@ -447,7 +550,7 @@ async function showNewCampaignModal() {
     });
   }
 
-  function renderStep() {
+  async function renderStep() {
     updateSteps();
     const body = modal.querySelector('#wc-body');
     const foot = modal.querySelector('#wc-foot');
@@ -598,6 +701,70 @@ async function showNewCampaignModal() {
         });
       });
     }
+
+    if (state.step === 5) {
+      body.innerHTML = `
+        <div class="form-group"><label>${icon('shield', 'ic-14')} Gmail Deliverability Mode</label><div class="muted small">Reduce spam risk when sending lean, low-volume outreach through regular Gmail accounts.</div></div>
+
+        <div class="form-group">
+          <label>${icon('eye', 'ic-14')} Open Tracking</label>
+          <label class="toggle-row">
+            <input type="checkbox" name="openTracking" ${state.tracking.openTracking ? 'checked' : ''}>
+            <span class="toggle" ></span>
+            <span class="muted small">Injects a 1px tracking pixel. OFF is recommended for Gmail lean outreach.</span>
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label>${icon('eye', 'ic-14')} Click Tracking</label>
+          <label class="toggle-row">
+            <input type="checkbox" name="clickTracking" ${state.tracking.clickTracking ? 'checked' : ''}>
+            <span class="toggle" ></span>
+            <span class="muted small">Rewrites links through a tracking redirect. OFF is recommended for Gmail.</span>
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label>${icon('shield', 'ic-14')} Conservative Sending Mode</label>
+          <label class="toggle-row">
+            <input type="checkbox" name="conservativeMode" ${state.deliverability.conservativeMode ? 'checked' : ''}>
+            <span class="toggle" ></span>
+            <span class="muted small">Sequential sends with a small randomized delay; no marketing wrappers added to your email.</span>
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label>${icon('x', 'ic-14')} Stop conditions</label>
+          <div class="deliv-grid">
+            <label class="toggle-row c"><input type="checkbox" name="stopOnReply" ${state.deliverability.stopOnReply ? 'checked' : ''}><span class="toggle"></span> Stop on Reply</label>
+            <label class="toggle-row c"><input type="checkbox" name="stopOnBounce" ${state.deliverability.stopOnBounce ? 'checked' : ''}><span class="toggle"></span> Stop on Bounce</label>
+            <label class="toggle-row c"><input type="checkbox" name="stopOnUnsubscribe" ${state.deliverability.stopOnUnsubscribe ? 'checked' : ''}><span class="toggle"></span> Stop on Unsubscribe</label>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Daily Send Limit (per account)</label>
+            <input type="number" name="dailySendLimit" min="0" value="${state.deliverability.dailySendLimit}" />
+          </div>
+          <div class="form-group">
+            <label>Min delay (s)</label>
+            <input type="number" name="delayMinSec" min="0" value="${state.deliverability.delayMinSec}" />
+          </div>
+          <div class="form-group">
+            <label>Max delay (s)</label>
+            <input type="number" name="delayMaxSec" min="0" value="${state.deliverability.delayMaxSec}" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>${icon('fileText', 'ic-14')} Optional Footer (plain outreach)</label>
+          <textarea name="footerText" class="em-msg" rows="2" placeholder="If this isn't relevant, just let me know and I won't follow up.">${escapeHtml(state.deliverability.footerText)}</textarea>
+        </div>`;
+      foot.innerHTML = `
+        <button class="btn btn-ghost" data-wc-back>${icon('arrowLeft')} Back</button>
+        <button class="btn btn-primary" data-wc-save>${icon('save')} Save Campaign</button>`;
+    }
   }
 
   modal.addEventListener('click', (e) => {
@@ -616,7 +783,7 @@ async function showNewCampaignModal() {
       capture();
       if (state.step === 1 && !state.name) return UI.toast('Please enter a campaign name.', 'error');
       if (state.step === 2 && !state.selected.size) return UI.toast('Select at least one lead for the audience.', 'error');
-      state.step = Math.min(4, state.step + 1);
+      state.step = Math.min(5, state.step + 1);
       renderStep();
       return;
     }
@@ -648,7 +815,10 @@ async function showNewCampaignModal() {
     saveBtn.innerHTML = `${icon('refreshCw', 'ic-14 spin')} Saving...`;
 
     try {
-      const campaign = await API.campaigns.create({ name: state.name, accountId: state.accountId, subject: state.subject, body: state.body });
+      const campaign = await API.campaigns.create({
+        name: state.name, accountId: state.accountId, subject: state.subject, body: state.body,
+        tracking: state.tracking, deliverability: state.deliverability
+      });
       await API.campaigns.assignLeads(campaign.id, [...state.selected]);
       UI.toast(`Campaign "${state.name}" created with ${state.selected.size} leads.`);
       close();
@@ -664,10 +834,8 @@ async function showNewCampaignModal() {
 }
 
 function showEditCampaignModal(c) {
-  let accounts = [];
-  try {
-    accounts = API.accounts.list ? [] : [];
-  } catch (e) {}
+  const tr = c.tracking || { openTracking: false, clickTracking: false };
+  const dv = c.deliverability || { conservativeMode: true, stopOnReply: true, stopOnBounce: true, stopOnUnsubscribe: true, dailySendLimit: 40, delayMinSec: 90, delayMaxSec: 180, footerText: '' };
 
   const body = `
     <form id="edit-campaign-form" class="form-grid">
@@ -693,6 +861,42 @@ function showEditCampaignModal(c) {
           </select>
         </div>
       </div>
+      <div class="form-group" style="border-top:1px solid var(--line);padding-top:16px;margin-top:8px">
+        <label>${icon('shield', 'ic-14')} Gmail Deliverability Mode</label>
+        <div class="muted small" style="margin-bottom:12px">Tracking and sender behavior for this campaign.</div>
+        <div class="form-group">
+          <label class="toggle-row"><input type="checkbox" name="openTracking" ${tr.openTracking ? 'checked' : ''}><span class="toggle"></span> Open Tracking</label>
+        </div>
+        <div class="form-group">
+          <label class="toggle-row"><input type="checkbox" name="clickTracking" ${tr.clickTracking ? 'checked' : ''}><span class="toggle"></span> Click Tracking</label>
+        </div>
+        <div class="form-group">
+          <label class="toggle-row"><input type="checkbox" name="conservativeMode" ${dv.conservativeMode ? 'checked' : ''}><span class="toggle"></span> Conservative Sending Mode</label>
+        </div>
+        <div class="deliv-grid">
+          <label class="toggle-row c"><input type="checkbox" name="stopOnReply" ${dv.stopOnReply ? 'checked' : ''}><span class="toggle"></span> Stop on Reply</label>
+          <label class="toggle-row c"><input type="checkbox" name="stopOnBounce" ${dv.stopOnBounce ? 'checked' : ''}><span class="toggle"></span> Stop on Bounce</label>
+          <label class="toggle-row c"><input type="checkbox" name="stopOnUnsubscribe" ${dv.stopOnUnsubscribe ? 'checked' : ''}><span class="toggle"></span> Stop on Unsubscribe</label>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Daily Send Limit</label>
+            <input type="number" name="dailySendLimit" min="0" value="${dv.dailySendLimit}">
+          </div>
+          <div class="form-group">
+            <label>Min delay (s)</label>
+            <input type="number" name="delayMinSec" min="0" value="${dv.delayMinSec}">
+          </div>
+          <div class="form-group">
+            <label>Max delay (s)</label>
+            <input type="number" name="delayMaxSec" min="0" value="${dv.delayMaxSec}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Optional Footer</label>
+          <textarea name="footerText" class="em-msg" rows="2">${escapeHtml(dv.footerText || '')}</textarea>
+        </div>
+      </div>
     </form>`;
 
   const footer = `
@@ -704,12 +908,24 @@ function showEditCampaignModal(c) {
   UI.on('#save-edit-campaign', 'click', async () => {
     const form = document.getElementById('edit-campaign-form');
     const fd = new FormData(form);
+    const cb = (n) => form.querySelector(`input[name="${n}"]`)?.checked === true;
     try {
       await API.campaigns.update(c.id, {
         name: fd.get('name').trim(),
         subject: fd.get('subject').trim(),
         body: fd.get('body').trim(),
         status: fd.get('status'),
+        tracking: { openTracking: cb('openTracking'), clickTracking: cb('clickTracking') },
+        deliverability: {
+          conservativeMode: cb('conservativeMode'),
+          stopOnReply: cb('stopOnReply'),
+          stopOnBounce: cb('stopOnBounce'),
+          stopOnUnsubscribe: cb('stopOnUnsubscribe'),
+          dailySendLimit: parseInt(fd.get('dailySendLimit'), 10) || 40,
+          delayMinSec: parseInt(fd.get('delayMinSec'), 10) || 90,
+          delayMaxSec: parseInt(fd.get('delayMaxSec'), 10) || 180,
+          footerText: fd.get('footerText') || '',
+        },
       });
       UI.closeModal();
       UI.toast('Campaign updated.');

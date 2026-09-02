@@ -103,7 +103,8 @@ async function renderLeads() {
 }
 
 function leadRow(l) {
-  const tags = (typeof l.tags === 'string') ? JSON.parse(l.tags || '[]') : (l.tags || []);
+  let tags = [];
+  try { tags = (typeof l.tags === 'string') ? JSON.parse(l.tags || '[]') : (l.tags || []); } catch { tags = []; }
   return `
     <tr class="row-click" data-lead="${l.id}">
       <td>
@@ -151,6 +152,14 @@ async function renderLeadDetail(id) {
   const fitBreakdown = lead.fitBreakdown ? (typeof lead.fitBreakdown === 'string' ? JSON.parse(lead.fitBreakdown) : lead.fitBreakdown) : null;
   const tags = lead.tags || [];
 
+  let clientReplies = [];
+  try {
+    const allReplies = await API.emails.replies();
+    clientReplies = (allReplies || [])
+      .filter(r => r.leadId === lead.id)
+      .sort((a, b) => new Date(b.receivedAt || b.createdAt) - new Date(a.receivedAt || a.createdAt));
+  } catch (e) {}
+
   const contactCount = contacts.length;
   const evidenceCount = evidence.length;
 
@@ -170,6 +179,7 @@ async function renderLeadDetail(id) {
       <div class="page-actions">
         <button class="btn btn-secondary" data-action="edit-lead">${icon('edit')} Edit</button>
         <button class="btn btn-secondary" data-action="send-email">${icon('send')} Send Email</button>
+        <button class="btn btn-secondary" data-action="export-lead-emails">${icon('download')} Email Log</button>
       </div>
     </div>
 
@@ -193,7 +203,7 @@ async function renderLeadDetail(id) {
             <div class="info-grid">
               <div class="info-row"><span class="info-label">${icon('mail', 'ic-16')} Email</span><span>${escapeHtml(lead.email || companyData.email || 'Not found')}</span></div>
               <div class="info-row"><span class="info-label">${icon('phone', 'ic-16')} Phone</span><span>${escapeHtml(lead.phone || companyData.phone || 'Not found')}</span></div>
-              <div class="info-row"><span class="info-label">${icon('globe', 'ic-16')} Website</span><span>${companyData.website ? `<a href="${escapeHtml(companyData.website)}" target="_blank" style="color:var(--brand)">${escapeHtml(companyData.website)}</a>` : 'Not found'}</span></div>
+              <div class="info-row"><span class="info-label">${icon('globe', 'ic-16')} Website</span><span>${companyData.website ? `<a href="${/^https?:\/\//i.test(companyData.website) ? escapeHtml(companyData.website) : '#'}" target="_blank" rel="noopener noreferrer" style="color:var(--brand)">${escapeHtml(companyData.website)}</a>` : 'Not found'}</span></div>
               <div class="info-row"><span class="info-label">${icon('mapPin', 'ic-16')} Location</span><span>${escapeHtml(lead.location || [companyData.city, companyData.country].filter(Boolean).join(', ') || 'Unknown')}</span></div>
               <div class="info-row"><span class="info-label">${icon('tag', 'ic-16')} Industry</span><span>${escapeHtml(lead.industry || companyData.industry || 'Unknown')}</span></div>
               <div class="info-row"><span class="info-label">${icon('link', 'ic-16')} Source</span><span>${escapeHtml(lead.source || companyData.source || 'Unknown')}</span></div>
@@ -347,20 +357,54 @@ async function renderLeadDetail(id) {
         <div class="card">
           <div class="card-head">
             <div>
+              <div class="card-title">${icon('messageSquare', 'ic-16')} Client Replies (${clientReplies.length})</div>
+              <div class="card-sub">What this client replied</div>
+            </div>
+            ${clientReplies.length ? `<a href="#" class="btn btn-sm btn-ghost" data-lead-view-replies>${icon('arrowRight')} Open Replies</a>` : ''}
+          </div>
+          <div class="card-body" style="padding:0;max-height:280px;overflow-y:auto">
+            ${clientReplies.length ? clientReplies.map(r => `
+              <div class="reply-item" style="border-top:none;padding:16px 20px">
+                <div class="reply-head" style="margin-bottom:8px">
+                  <div class="row" style="gap:8px">
+                    <div class="cell-main" style="font-size:12.5px">${escapeHtml(r.fromEmail || 'Unknown')}</div>
+                    <span class="badge ${r.sentiment === 'positive' ? 'st-res' : r.sentiment === 'neutral' ? 'st-new' : 'st-dnc'}">${r.sentiment || 'neutral'}</span>
+                  </div>
+                  <span class="muted small">${UI.formatDate(r.receivedAt || r.createdAt)}</span>
+                </div>
+                <div class="reply-subject" style="font-size:12.5px">${escapeHtml(r.subject || 'No subject')}</div>
+                <p class="reply-text" style="font-size:12.5px;margin-top:4px">${escapeHtml(clientReplyText(r))}</p>
+              </div>
+            `).join('') : '<div style="text-align:center;padding:28px;color:var(--text-3);font-size:12.5px">No replies from this client yet</div>'}
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div>
               <div class="card-title">Activity Timeline</div>
               <div class="card-sub">${activities.length} activities</div>
             </div>
           </div>
           <div class="act-list">
-            ${activities.length ? activities.map(a => `
-              <div class="act-item">
-                <div class="act-ic ${getActivityIconCls(a.type)}">${icon(getActivityIcon(a.type))}</div>
-                <div class="act-body">
-                  <div>${escapeHtml(a.description)}</div>
-                  <time>${UI.formatDate(a.timestamp)}</time>
-                </div>
-              </div>
-            `).join('') : '<div class="act-item" style="justify-content:center;color:var(--text-3)">No activities yet</div>'}
+            ${activities.length ? activities.map(a => {
+              let replyText = null;
+              if (a.type === 'reply_received') {
+                try {
+                  const meta = (typeof a.metadata === 'string') ? JSON.parse(a.metadata || '{}') : (a.metadata || {});
+                  replyText = (meta.snippet || '').trim() || null;
+                } catch {}
+              }
+              return `
+                <div class="act-item">
+                  <div class="act-ic ${getActivityIconCls(a.type)}">${icon(getActivityIcon(a.type))}</div>
+                  <div class="act-body">
+                    <div>${escapeHtml(a.description)}</div>
+                    ${replyText ? `<div class="act-reply">${escapeHtml(replyText)}</div>` : ''}
+                    <time>${UI.formatDate(a.timestamp)}</time>
+                  </div>
+                </div>`;
+            }).join('') : '<div class="act-item" style="justify-content:center;color:var(--text-3)">No activities yet</div>'}
           </div>
         </div>
       </div>
@@ -368,6 +412,23 @@ async function renderLeadDetail(id) {
 
   UI.renderView(html);
   bindLeadDetailEvents(lead);
+}
+
+function clientReplyText(r) {
+  const text = (r.body || r.snippet || '').replace(/\r\n/g, '\n');
+  const lines = text.split('\n');
+  const wroteIdx = lines.findIndex(l => /^wrote:\s*$/i.test(l.trim()));
+  let clientLines;
+  if (wroteIdx > 0) {
+    clientLines = lines.slice(0, wroteIdx - 1);
+  } else {
+    clientLines = lines.slice(0);
+  }
+  return clientLines
+    .map(l => l.trim())
+    .filter(l => l && !l.startsWith('>'))
+    .join(' ')
+    .trim();
 }
 
 function formatFitLabel(key) {
@@ -422,8 +483,13 @@ function bindLeadsEvents() {
 
   UI.delegate('#view', '[data-action="add-lead"]', 'click', () => showAddLeadModal());
 
-  UI.delegate('#view', '[data-action="export-leads"]', 'click', () => {
-    UI.toast('Export started — download will begin shortly.');
+  UI.delegate('#view', '[data-action="export-leads"]', 'click', async () => {
+    try {
+      await API.export.leads();
+      UI.toast('Leads exported.');
+    } catch (err) {
+      UI.toast('Export failed: ' + err.message, 'error');
+    }
   });
 
   let searchTimer = null;
@@ -504,7 +570,22 @@ async function bindLeadDetailEvents(lead) {
   });
 
   UI.delegate('#view', '[data-action="send-email"]', 'click', () => {
-    UI.toast('Email composer would open here.');
+    if (!lead.email) return UI.toast('This lead has no email address.', 'error');
+    showSendEmailModal({ to: lead.email, leadId: lead.id });
+  });
+
+  UI.delegate('#view', '[data-action="export-lead-emails"]', 'click', async () => {
+    try {
+      await API.export.leadEmails(lead.id);
+      UI.toast('Lead email log exported.');
+    } catch (err) {
+      UI.toast('Export failed: ' + err.message, 'error');
+    }
+  });
+
+  UI.delegate('#view', '[data-lead-view-replies]', 'click', (e) => {
+    e.preventDefault();
+    Store.navigate('replies');
   });
 
   UI.delegate('#view', '[data-action="edit-lead"]', 'click', () => {

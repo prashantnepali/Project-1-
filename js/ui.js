@@ -164,7 +164,7 @@ const UI = {
     const unread = Store.getUnreadRepliesCount();
     const current = Store.get('currentView');
     const settings = Store.get('settings');
-    const profileName = settings.profileName || 'Prashant Kumar';
+    const profileName = settings.profileName || 'Prashant';
     const profileEmail = settings.profileEmail || 'prashant@samparka.io';
 
     sb.innerHTML = `

@@ -87,4 +87,14 @@ router.post('/notifications/read', (req, res) => {
   }
 });
 
+// Record a confirmed hard bounce (suppresses the address globally).
+router.post('/sends/:id/bounce', (req, res) => {
+  try {
+    const result = emailService.markBounced(req.params.id);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

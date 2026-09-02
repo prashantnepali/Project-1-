@@ -31,6 +31,7 @@ async function renderTasks() {
         <p class="page-sub">${stats.pending} pending · ${stats.overdue} overdue · ${stats.completed} completed</p>
       </div>
       <div class="page-actions">
+        <button class="btn btn-secondary" data-action="export-tasks">${icon('download')} Export</button>
         <button class="btn btn-primary" data-action="add-task">${icon('plus')} New Task</button>
       </div>
     </div>
@@ -95,6 +96,15 @@ function bindTasksEvents() {
   });
 
   UI.delegate('#view', '[data-action="add-task"]', 'click', () => showTaskModal());
+
+  UI.delegate('#view', '[data-action="export-tasks"]', 'click', async () => {
+    try {
+      await API.export.tasks();
+      UI.toast('Tasks exported.');
+    } catch (err) {
+      UI.toast('Export failed: ' + err.message, 'error');
+    }
+  });
 
   UI.delegate('#view', '[data-task-toggle]', 'click', async (e, el) => {
     e.stopPropagation();

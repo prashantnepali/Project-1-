@@ -5,7 +5,6 @@ const cors = require('cors');
 const path = require('path');
 const { initSchema } = require('./db/schema');
 const { closeDb } = require('./db/connection');
-
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -40,6 +39,14 @@ app.use(express.static(path.join(__dirname)));
 
 initSchema();
 
+// Recover campaign_queue rows that were 'processing' when the server stopped,
+// so a restart never loses or duplicate-sends them.
+try {
+  require('./services/campaign/campaign-service').recoverStaleQueue();
+} catch (e) {
+  console.warn('[WARN] queue recovery skipped:', e.message);
+}
+
 app.use('/api/discover', require('./routes/discovery'));
 app.use('/api/prospects', require('./routes/prospects'));
 app.use('/api/leads', require('./routes/leads'));
@@ -49,37 +56,48 @@ app.use('/api/campaigns', require('./routes/campaigns'));
 app.use('/api/emails', require('./routes/emails'));
 app.use('/api/tracking', require('./routes/tracking'));
 app.use('/api/deals', require('./routes/deals'));
+app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/templates', require('./routes/templates'));
+app.use('/api/suppressions', require('./routes/suppressions'));
+app.use('/api/export', require('./routes/export'));
 app.use('/api', require('./routes/auth'));
 
 app.delete('/api/data', (req, res) => {
   try {
+    if (req.body.confirm !== 'DELETE_ALL') {
+      return res.status(400).json({ error: 'Missing confirm: "DELETE_ALL" in request body' });
+    }
     const { getDb } = require('./db/connection');
     const db = getDb();
-    db.exec(`
-      DELETE FROM email_templates;
-      DELETE FROM tasks;
-      DELETE FROM deals;
-      DELETE FROM notifications;
-      DELETE FROM email_replies;
-      DELETE FROM email_sends;
-      DELETE FROM campaign_leads;
-      DELETE FROM campaigns;
-      DELETE FROM email_accounts;
-      DELETE FROM activities;
-      DELETE FROM notes;
-      DELETE FROM evidence;
-      DELETE FROM enrichments;
-      DELETE FROM lead_tags;
-      DELETE FROM lead_scores;
-      DELETE FROM leads;
-      DELETE FROM discovery_results;
-      DELETE FROM discovery_searches;
-      DELETE FROM contacts;
-      DELETE FROM companies;
-      DELETE FROM settings;
-    `);
+    const tx = db.transaction(() => {
+      db.exec(`
+        DELETE FROM email_templates;
+        DELETE FROM tasks;
+        DELETE FROM deals;
+        DELETE FROM notifications;
+        DELETE FROM email_replies;
+        DELETE FROM email_sends;
+        DELETE FROM campaign_queue;
+        DELETE FROM suppressions;
+        DELETE FROM campaign_leads;
+        DELETE FROM campaigns;
+        DELETE FROM email_accounts;
+        DELETE FROM activities;
+        DELETE FROM notes;
+        DELETE FROM evidence;
+        DELETE FROM enrichments;
+        DELETE FROM lead_tags;
+        DELETE FROM lead_scores;
+        DELETE FROM leads;
+        DELETE FROM discovery_results;
+        DELETE FROM discovery_searches;
+        DELETE FROM contacts;
+        DELETE FROM companies;
+        DELETE FROM settings;
+      `);
+    });
+    tx();
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -87,7 +105,7 @@ app.delete('/api/data', (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', version: '2.5.2' });
+  res.json({ status: 'ok', version: '3.0.0' });
 });
 
 app.get('*', (req, res) => {

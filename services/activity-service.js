@@ -25,7 +25,30 @@ function getActivities(filters = {}) {
     params.push(filters.limit);
   }
 
-  return db.prepare(query).all(...params);
+  const rows = db.prepare(query).all(...params);
+
+  // Enrich reply_received activities with the recipient's reply text.
+  // Old activities don't store the snippet in metadata, so look it up from
+  // the email_replies table by messageId/threadId/leadId.
+  for (const row of rows) {
+    if (row.type !== 'reply_received') continue;
+
+    let meta = {};
+    try { meta = (typeof row.metadata === 'string') ? JSON.parse(row.metadata || '{}') : (row.metadata || {}); } catch {}
+
+    let replyText = meta.snippet || null;
+    if (!replyText) {
+      // Fall back to the stored reply for this activity's lead (most recent reply).
+      const reply = db.prepare(`
+        SELECT snippet, body FROM email_replies WHERE leadId = ? ORDER BY COALESCE(receivedAt, createdAt) DESC LIMIT 1
+      `).get(row.leadId);
+      if (reply) replyText = reply.snippet || reply.body || null;
+    }
+    meta.snippet = replyText;
+    row.metadata = JSON.stringify(meta);
+  }
+
+  return rows;
 }
 
 module.exports = { getActivities };
